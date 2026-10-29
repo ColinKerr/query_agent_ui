@@ -8,10 +8,10 @@
  * ```
  */
 
-import type { RunRawQuery } from "./caps";
+import { readCapped, type RunRawQuery } from "./caps";
 import { driveTurns, fetchTurns, runStartupQueries, type AgentRun, type ClientOptions, type StartupList, type TurnCall } from "./client";
 import defaultList from "./startup-queries.json";
-import type { ChatMessage, Note, StartupResult, TranscriptStep } from "./turn-api";
+import type { ChatMessage, Note, QueryRows, ResultCaps, StartupResult, TranscriptStep } from "./turn-api";
 
 /** What the client is doing: what a host shows while it waits. */
 export type AgentStatus =
@@ -84,6 +84,16 @@ export class AgentClient {
       this.explored = true;
       this.options.onExploring?.(false);
     }
+  }
+
+  /**
+   * Read a query's rows on the iModel, up to the caps given: for a host that shows an answer's
+   * results. Throws when there is no iModel, or the query fails.
+   */
+  public async read(ecsql: string, caps: ResultCaps = { maxRows: 200, maxChars: 200_000, maxCellChars: 400 }): Promise<Pick<QueryRows, "columns" | "rows" | "clipped" | "truncatedBy">> {
+    if (!this.options.runQuery)
+      throw new Error("No iModel is open.");
+    return readCapped(await this.options.runQuery(ecsql), caps);
   }
 
   /** Answer one question. While the startup list still runs, it waits for it, with the status `exploring`. */

@@ -10,6 +10,7 @@ between them is `docs/turn-api.md` in `query_agent_function`.
 | Package | Holds |
 |---|---|
 | `packages/client` | `AgentClient`, the query runner, the turn driver, the startup query list, and the API types |
+| `packages/react` | `AgentChat` (the chat and the ask box), `AgentWorkbench` (the chat with the steps, notes, results and earlier chats beside it), and the feedback form |
 
 ### Use the client
 
@@ -36,6 +37,23 @@ import { connectionFromProps, startNodeFrontend } from "@query-agent/client/node
 await startNodeFrontend(backendUrl);
 const imodel = connectionFromProps(connectionPropsFromTheBackend);
 ```
+
+### The controls
+
+```tsx
+import { AgentWorkbench } from "@query-agent/react";
+import "@query-agent/react/styles.css";
+
+<AgentWorkbench
+  client={client}                       // a started AgentClient, or undefined: "not set up"
+  editorText={() => editor.value}       // sent with each question
+  onUseQuery={(ecsql) => editor.setValue(ecsql)}
+  onFeedback={(feedback) => send(feedback)} // only what the user saw and wrote, after they review it
+/>
+```
+
+While a run is in progress the chat shows "Exploring", "Thinking" or "Running a query", with
+moving dots. Nothing is uploaded by the controls: feedback goes to the host's `onFeedback`.
 
 ## Build and test
 
