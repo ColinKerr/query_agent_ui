@@ -8,10 +8,20 @@
   "module": "dist/esm/index.js",
   "types": "dist/cjs/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/cjs/index.d.ts", "import": "./dist/esm/index.js", "require": "./dist/cjs/index.js" },
-    "./node": { "types": "./dist/cjs/node/index.d.ts", "require": "./dist/cjs/node/index.js" }
+    ".": {
+      "types": "./dist/cjs/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
+    },
+    "./node": {
+      "types": "./dist/cjs/node/index.d.ts",
+      "require": "./dist/cjs/node/index.js"
+    },
+    "./startup-queries.json": "./dist/cjs/startup-queries.json"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.esm.json"
   },
@@ -22,9 +32,17 @@
     "jsdom": "^26.1.0"
   },
   "peerDependenciesMeta": {
-    "@itwin/core-common": { "optional": true },
-    "@itwin/core-frontend": { "optional": true },
-    "global-jsdom": { "optional": true },
-    "jsdom": { "optional": true }
+    "@itwin/core-common": {
+      "optional": true
+    },
+    "@itwin/core-frontend": {
+      "optional": true
+    },
+    "global-jsdom": {
+      "optional": true
+    },
+    "jsdom": {
+      "optional": true
+    }
   }
 }
