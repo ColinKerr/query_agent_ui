@@ -71,6 +71,7 @@ export function AgentWorkbench(props: AgentWorkbenchProps): JSX.Element {
   };
 
   return (
+    <div className="qa-workbench-frame">
     <div className="qa-workbench">
       <div className="qa-workbench-chat">
         <AgentChat
@@ -123,6 +124,7 @@ export function AgentWorkbench(props: AgentWorkbenchProps): JSX.Element {
           </ul>
         )}
       </div>
+    </div>
     </div>
   );
 }

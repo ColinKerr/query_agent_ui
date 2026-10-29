@@ -13,6 +13,9 @@ import { driveTurns, fetchTurns, runStartupQueries, type AgentRun, type ClientOp
 import defaultList from "./startup-queries.json";
 import type { ChatMessage, Note, QueryRows, ResultCaps, StartupResult, TranscriptStep } from "./turn-api";
 
+/** The library's startup query list (`startup-queries.json`): what a client runs when it starts. */
+export const DEFAULT_STARTUP_LIST = defaultList as StartupList;
+
 /** What the client is doing: what a host shows while it waits. */
 export type AgentStatus =
   | { phase: "exploring" }
@@ -77,7 +80,7 @@ export class AgentClient {
     this.options.onExploring?.(true);
     try {
       // A list that cannot run leaves the block out, and the agent works without it.
-      return (await runStartupQueries(this.options.startupList ?? (defaultList as StartupList), runQuery)).results;
+      return (await runStartupQueries(this.options.startupList ?? DEFAULT_STARTUP_LIST, runQuery)).results;
     } catch {
       return undefined;
     } finally {

@@ -17,6 +17,7 @@
 .qa-feedback label { display: flex; flex-direction: column; width: 100%; gap: 2px; }
 .qa-feedback textarea { font: inherit; }
 .qa-feedback-preview { width: 100%; margin: 0; overflow-x: auto; }
+.qa-workbench-frame { container-type: inline-size; height: 100%; min-height: 0; }
 .qa-workbench { display: flex; height: 100%; min-height: 0; gap: 8px; }
 .qa-workbench-chat { flex: 3 1 0; min-width: 0; display: flex; flex-direction: column; }
 .qa-workbench-side { flex: 2 1 0; min-width: 0; overflow-y: auto; border-left: 1px solid var(--qa-border, #ddd); padding: 0 8px; }
@@ -26,4 +27,10 @@
 .qa-step-failed .qa-step-tool { color: var(--qa-error, #a40000); }
 .qa-results table { border-collapse: collapse; font-size: 0.9em; }
 .qa-results th, .qa-results td { border: 1px solid var(--qa-border, #ddd); padding: 2px 6px; text-align: left; vertical-align: top; }
-@media (max-width: 700px) { .qa-workbench { flex-direction: column; } .qa-workbench-side { border-left: none; border-top: 1px solid var(--qa-border, #ddd); } }
+/* By the control's own width, not the window's: it often sits in a side pane. */
+@container (max-width: 700px) {
+  .qa-workbench { flex-direction: column; }
+  .qa-workbench-chat { flex: 1 1 auto; min-height: 60%; }
+  .qa-workbench-side { flex: 0 0 auto; max-height: 40%; border-left: none; border-top: 1px solid var(--qa-border, #ddd); }
+}
+.qa-answer-actions { margin-top: 6px; display: flex; gap: 6px; }

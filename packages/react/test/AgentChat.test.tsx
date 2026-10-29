@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
+import { act } from "react";
 import { AgentClient } from "@query-agent/client";
 import { AgentChat } from "../src/AgentChat";
 import { FAILED } from "../src/chat";
@@ -77,5 +78,20 @@ describe("AgentChat", () => {
     const { container } = mount(<AgentChat />);
     expect(container.querySelector(".qa-notice")?.textContent).toBe("The agent is not set up.");
     expect(container.querySelector("textarea")?.disabled).toBe(true);
+  });
+});
+
+describe("AgentChat, driven by the host", () => {
+  it("asks a question the host gives, once for each key, and draws the host's buttons under the answer", async () => {
+    const turns = scriptedTurns([response([], { answer: "From the case." })]);
+    const client = AgentClient.start({ turns });
+    const { container, root } = mount(<AgentChat client={client} question={{ text: "the case's question", key: 1 }} answerActions={() => <button type="button">New case</button>} />);
+    await settle();
+    expect(turns.requests[0].question).toBe("the case's question");
+    expect(container.querySelector(".qa-answer-text")?.textContent).toBe("From the case.");
+    expect(button(container, "New case")).toBeDefined();
+    act(() => root.render(<AgentChat client={client} question={{ text: "the case's question", key: 1 }} />));
+    await settle();
+    expect(turns.requests).toHaveLength(1);
   });
 });

@@ -33,6 +33,10 @@ export interface AgentChatProps {
   /** Called with each status and step while a run is in progress. */
   onStatus?: (status: AgentStatus | undefined) => void;
   placeholder?: string;
+  /** A question for the control to ask, as if typed: asked when `key` changes (the Cases tab's "Ask"). */
+  question?: { text: string; key: string | number };
+  /** The host's buttons under each finished answer, such as "New case from this run". */
+  answerActions?: (turn: ChatTurn, index: number) => ReactNode;
 }
 
 /** What the user sees while the agent works. */
@@ -69,8 +73,8 @@ export function AgentChat(props: AgentChatProps): JSX.Element {
     onStatus?.(next);
   };
 
-  const ask = async (): Promise<void> => {
-    const text = question.trim();
+  const ask = async (asked?: string): Promise<void> => {
+    const text = (asked ?? question).trim();
     if (!client || busy || text.length === 0)
       return;
     const controller = new AbortController();
@@ -101,6 +105,16 @@ export function AgentChat(props: AgentChatProps): JSX.Element {
     stop.current = undefined;
   };
 
+  // A question the host asks: once for each key, when the control is free.
+  const hostQuestion = props.question;
+  const askedKey = useRef<string | number | undefined>(undefined);
+  useEffect(() => {
+    if (!hostQuestion || hostQuestion.key === askedKey.current || !client || busy)
+      return;
+    askedKey.current = hostQuestion.key;
+    void ask(hostQuestion.text);
+  });
+
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
     // Enter asks; Shift+Enter is a new line. A question is usually one line.
     if (event.key === "Enter" && !event.shiftKey) {
@@ -128,6 +142,7 @@ export function AgentChat(props: AgentChatProps): JSX.Element {
                         {onUseQuery && <button type="button" onClick={() => onUseQuery(turn.query!)}>Use this query</button>}
                       </div>
                     )}
+                    {props.answerActions && <div className="qa-answer-actions">{props.answerActions(turn, index)}</div>}
                     {renderAfterAnswer?.(turn, index)}
                   </div>
                 )
