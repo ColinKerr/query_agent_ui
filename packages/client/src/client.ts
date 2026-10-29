@@ -1,0 +1,317 @@
+/**
+ * The client's half of a turn: running the queries the function asks for and reading their rows,
+ * and running the startup query list before the first turn.
+ *
+ * The function never reaches the iModel. Each response names the queries to run and the caps to
+ * read them to; the client runs them on its own iModel and sends the rows with the next turn. The
+ * startup list's rows go with every turn, and the function writes them into the instructions.
+ */
+
+import { readCapped, type RunRawQuery } from "./caps";
+import {
+  TURN_VERSION, type ChatMessage, type LoadedSkill, type Note, type QueryRows, type ResultCaps, type StartupResult, type StopReason,
+  type SubmittedAnswer, type TokenUsage, type TranscriptStep, type TurnRequest, type TurnResponse, type TurnState,
+} from "./turn-api";
+
+/** What the client supplies to a run, wherever the function runs. */
+export interface ClientOptions {
+  /** Absent when no iModel is open: the agent is told so and `runQuery` is not offered. */
+  runQuery?: RunRawQuery;
+  /** The open iModel: its name, and the rows of the startup query list (`runStartupQueries`), run once per iModel. */
+  imodel?: { name: string; startup?: StartupResult[] };
+  editorText?: string;
+  /** Earlier turns of this chat, excluding the system message, which is rebuilt each turn. */
+  history?: readonly ChatMessage[];
+  /** Notes carried over from earlier turns. */
+  notes?: readonly Note[];
+  onStep?: (step: TranscriptStep) => void;
+  onNote?: (note: Note) => void;
+  /** Called before each turn is sent (`thinking`), and before each query runs (`querying`, with its ECSql). */
+  onPhase?: (phase: "thinking" | "querying", ecsql?: string) => void;
+  signal?: AbortSignal;
+}
+
+/** The finished run, as the client keeps it. */
+export interface AgentRun {
+  /** The final prose answer, which should carry exactly one fenced sql block. */
+  answer: string;
+  /** The query pulled out of the answer, if there was one. */
+  query?: string;
+  steps: TranscriptStep[];
+  notes: Note[];
+  /** The conversation, for persistence and for the next turn. */
+  messages: ChatMessage[];
+  /**
+   * The system prompt as last sent.
+   *
+   * Kept so a transcript explains itself without the repository beside it: the prompt is the
+   * thing being tuned, and a transcript that does not carry it cannot be compared against one
+   * produced by different assets. The last turn's is the interesting one -- it has every
+   * finding the run accumulated.
+   */
+  systemPrompt: string;
+  stoppedBecause: StopReason;
+  /** The answer as submitted with `submitAnswer`, when the run ended that way. */
+  structured?: SubmittedAnswer;
+  /** Research skills loaded during the run, in order, when they were on. */
+  skillsLoaded?: LoadedSkill[];
+  /** Requests to the model, and the tokens the endpoint reported for them (absent when it reported none). */
+  usage: { requests: number; tokens?: TokenUsage };
+}
+
+/** One call to the function: over HTTP (`fetchTurns`), or in the same process, for tests and training. */
+export type TurnCall = (request: TurnRequest, signal?: AbortSignal) => Promise<TurnResponse>;
+
+/**
+ * Drive a run: send a turn, run the queries the response asks for, send their rows with the next
+ * turn, until the response says the run is over. When the user stops the run, the next turn says
+ * so, and the function ends it.
+ */
+export async function driveTurns(question: string, client: ClientOptions, turn: TurnCall): Promise<AgentRun> {
+  const { runQuery } = client;
+  let messages: ChatMessage[] = [...(client.history ?? [])];
+  let steps: TranscriptStep[] = [];
+  let notes: Note[] = [...(client.notes ?? [])];
+  let state: TurnState | undefined;
+  let results: QueryRows[] | undefined;
+  for (;;) {
+    const request: TurnRequest = {
+      version: TURN_VERSION, question, canQuery: runQuery !== undefined, imodel: client.imodel, editorText: client.editorText,
+      messages, steps, notes, state, results, ...(client.signal?.aborted ? { aborted: true } : {}),
+    };
+    client.onPhase?.("thinking");
+    const response = await turn(request, client.signal);
+    messages = [...messages, ...response.messages];
+    steps = [...steps, ...response.steps];
+    notes = [...notes, ...response.notes];
+    for (const step of response.steps)
+      client.onStep?.(step);
+    for (const note of response.notes)
+      client.onNote?.(note);
+    state = response.state;
+    const done = response.done;
+    if (done) {
+      return {
+        ...(done.skillsLoaded ? { skillsLoaded: done.skillsLoaded } : {}),
+        answer: done.answer,
+        query: done.query,
+        steps,
+        notes,
+        messages,
+        systemPrompt: done.systemPrompt,
+        stoppedBecause: done.stoppedBecause,
+        usage: state.usage,
+        ...(done.structured ? { structured: done.structured } : {}),
+      };
+    }
+    results = [];
+    for (const ecsql of response.queries) {
+      client.onPhase?.("querying", ecsql);
+      results.push(await readQuery(runQuery!, ecsql, response.caps));
+    }
+  }
+}
+
+export interface FetchTurnsOptions {
+  /**
+   * The access token for the function, sent as `Authorization: Bearer <token>`. Unused until the
+   * function needs authentication (step 5 of the split plan); an input now so a host's code does
+   * not change then.
+   */
+  getAccessToken?: () => Promise<string | undefined>;
+}
+
+/**
+ * Turns over HTTP: `POST <url>/turn`, the same code in a browser and in Node. When the user stops
+ * the run while a turn is in flight, the same turn is sent again, saying the run was stopped, so
+ * the function ends it with what it has.
+ */
+export function fetchTurns(url: string, options: FetchTurnsOptions = {}): TurnCall {
+  const post = async (request: TurnRequest, signal?: AbortSignal): Promise<TurnResponse> => {
+    const token = await options.getAccessToken?.();
+    const response = await fetch(`${url.replace(/\/+$/, "")}/turn`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify(request),
+      signal,
+    });
+    const body = await response.json() as TurnResponse | { error?: string };
+    if (!response.ok)
+      throw new Error(`The agent function refused the turn (HTTP ${response.status}): ${(body as { error?: string }).error ?? "no reason given"}`);
+    return body as TurnResponse;
+  };
+  return async (request, signal) => {
+    // The turn that says the run was stopped must get through, so it is not tied to the signal.
+    if (request.aborted)
+      return post(request);
+    try {
+      return await post(request, signal);
+    } catch (err) {
+      if (!signal?.aborted)
+        throw err;
+      return post({ ...request, aborted: true });
+    }
+  };
+}
+
+/**
+ * Run one query and read it up to the caps. A failure, at the start or part way through the
+ * rows, is sent as the query's error: the function hands it to the model to correct.
+ */
+export async function readQuery(runQuery: RunRawQuery, ecsql: string, caps: ResultCaps): Promise<QueryRows> {
+  const started = Date.now();
+  try {
+    const read = await readCapped(await runQuery(ecsql), caps);
+    return { ecsql, ...read, ms: Date.now() - started };
+  } catch (err) {
+    return { ecsql, error: err instanceof Error ? err.message : String(err), ms: Date.now() - started };
+  }
+}
+
+/** One query of the startup list. */
+export interface StartupQuery {
+  rule: string;
+  id: string;
+  ecsql: string;
+  /** Rows sent. The rest are counted, not sent. */
+  max?: number;
+  /** Run only when these queries of the same rule were empty. */
+  onlyIfEmpty?: string[];
+  /** A second query run for every row sent, with the row's columns as `{0}`, `{1}`. It always runs to the end. */
+  each?: string;
+}
+
+/** The startup query list (`startup-queries.json`), which the client library carries. */
+export interface StartupList {
+  description?: string[];
+  lists: Record<string, string[]>;
+  queries: StartupQuery[];
+}
+
+/** One startup query run, for a report of what was asked and how long it took. */
+export interface QueryReport {
+  rule: string;
+  query: string;
+  ecsql: string;
+  ms: number;
+  rows: number;
+  skipped?: boolean;
+  /** A failed query is an empty one: the class or schema is not in this file. */
+  error?: string;
+}
+
+/** How many result rows are read at most, whatever `max` says: a guard, not a display limit. */
+const ROW_GUARD = 500;
+
+function quote(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+/** Expand `{{in:list}}`, `{{like:expr:list}}` and `{{notlike:expr:list}}`. An unknown list throws. */
+export function expandLists(ecsql: string, lists: Record<string, string[]>): string {
+  return ecsql.replace(/\{\{(in|like|notlike):([^}]+)\}\}/g, (_whole, kind: string, rest: string) => {
+    const at = rest.lastIndexOf(":");
+    const name = kind === "in" ? rest : rest.slice(at + 1);
+    const values = lists[name];
+    if (!values || values.length === 0)
+      throw new Error(`imodel-context: no list named "${name}"`);
+    if (kind === "in")
+      return values.map(quote).join(", ");
+    const expression = rest.slice(0, at);
+    const terms = values.map((value) => `${expression} ${kind === "like" ? "LIKE" : "NOT LIKE"} ${quote(value.includes("%") ? value : `%${value}%`)}`);
+    return `(${terms.join(kind === "like" ? " OR " : " AND ")})`;
+  });
+}
+
+/**
+ * A row's values inside the `each` query. They come from the file and land inside `[...]`, so
+ * a value that could close the bracket is refused; the row then sends null for `each`.
+ */
+function fillIdentifiers(template: string, row: unknown[]): string | undefined {
+  let safe = true;
+  const text = template.replace(/\{(\d+)\}/g, (_whole, index: string) => {
+    const value = String(row[Number(index)] ?? "");
+    if (!/^[A-Za-z0-9_]+$/.test(value))
+      safe = false;
+    return value;
+  });
+  return safe ? text : undefined;
+}
+
+async function readRows(runQuery: RunRawQuery, ecsql: string): Promise<unknown[][]> {
+  const result = await runQuery(ecsql);
+  const rows: unknown[][] = [];
+  for await (const row of result.rows) {
+    rows.push(row);
+    if (rows.length >= ROW_GUARD)
+      break;
+  }
+  return rows;
+}
+
+/** No rows, or the single cell of a count that came back 0. The function applies the same test. */
+function isEmpty(rows: unknown[][]): boolean {
+  return rows.length === 0 || (rows.length === 1 && rows[0].length === 1 && (rows[0][0] === 0 || rows[0][0] === null));
+}
+
+/**
+ * Run the startup list on the open iModel. Never throws for a query: a failure is an empty
+ * result. Only a list that names a list it does not define throws.
+ */
+export async function runStartupQueries(list: StartupList, runQuery: RunRawQuery): Promise<{ results: StartupResult[]; reports: QueryReport[] }> {
+  const results: StartupResult[] = [];
+  const reports: QueryReport[] = [];
+  const emptyByRule = new Map<string, Set<string>>();
+  for (const query of list.queries) {
+    const empty = emptyByRule.get(query.rule) ?? new Set<string>();
+    emptyByRule.set(query.rule, empty);
+    const ecsql = expandLists(query.ecsql, list.lists);
+    if (query.onlyIfEmpty && !query.onlyIfEmpty.every((id) => empty.has(id))) {
+      reports.push({ rule: query.rule, query: query.id, ecsql, ms: 0, rows: 0, skipped: true });
+      results.push({ rule: query.rule, id: query.id, rows: [], count: 0, skipped: true, ms: 0 });
+      continue;
+    }
+    const started = Date.now();
+    let rows: unknown[][] = [];
+    let error: string | undefined;
+    try {
+      rows = await readRows(runQuery, ecsql);
+    } catch (caught) {
+      error = (caught as Error).message;
+    }
+    const ms = Date.now() - started;
+    reports.push({ rule: query.rule, query: query.id, ecsql, ms, rows: rows.length, error });
+    const shown = rows.slice(0, query.max ?? 20);
+    const result: StartupResult = {
+      rule: query.rule, id: query.id, rows: shown, count: rows.length, ms,
+      ...(rows.length >= ROW_GUARD ? { guarded: true } : {}), ...(error !== undefined ? { error } : {}),
+    };
+    if (isEmpty(rows)) {
+      empty.add(query.id);
+    } else if (query.each) {
+      const each: (string | null)[] = [];
+      for (const row of shown) {
+        const eachSql = fillIdentifiers(query.each, row);
+        if (!eachSql) {
+          each.push(null);
+          continue;
+        }
+        const eachStarted = Date.now();
+        try {
+          const found = await readRows(runQuery, eachSql);
+          each.push(String(found[0]?.[0] ?? 0));
+          reports.push({ rule: query.rule, query: `${query.id}/each`, ecsql: eachSql, ms: Date.now() - eachStarted, rows: found.length });
+        } catch (caught) {
+          each.push(null);
+          reports.push({ rule: query.rule, query: `${query.id}/each`, ecsql: eachSql, ms: Date.now() - eachStarted, rows: 0, error: (caught as Error).message });
+        }
+      }
+      result.each = each;
+    }
+    results.push(result);
+  }
+  return { results, reports };
+}
+
+/** The earlier name of `fetchTurns`. */
+export const httpTurns = fetchTurns;
