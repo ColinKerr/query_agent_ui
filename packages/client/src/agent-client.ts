@@ -9,9 +9,9 @@
  */
 
 import { readCapped, type RunRawQuery } from "./caps";
-import { driveTurns, fetchTurns, runStartupQueries, type AgentRun, type ClientOptions, type StartupList, type TurnCall } from "./client";
+import { driveTurns, fetchTurns, runStartupQueries, type AgentRun, type AnswerRows, type ClientOptions, type StartupList, type TurnCall } from "./client";
 import defaultList from "./startup-queries.json";
-import type { ChatMessage, Note, QueryRows, ResultCaps, StartupResult, TranscriptStep } from "./turn-api";
+import type { EarlierQuestion, Note, QueryRows, ResultCaps, StartupResult, TranscriptStep } from "./turn-api";
 
 /** The library's startup query list (`startup-queries.json`): what a client runs when it starts. */
 export const DEFAULT_STARTUP_LIST = defaultList as StartupList;
@@ -21,6 +21,23 @@ export type AgentStatus =
   | { phase: "exploring" }
   | { phase: "thinking" }
   | { phase: "querying"; ecsql: string };
+
+/** How much of an answer's rows the client reads for the host to show. */
+export const ANSWER_CAPS: ResultCaps = { maxRows: 200, maxChars: 200_000, maxCellChars: 400 };
+
+/**
+ * An answer's query's rows, read once with `ANSWER_CAPS`, or the error it gave; undefined when
+ * there is no query. What `AgentClient.ask` keeps on the run, for the host and for later questions.
+ */
+export async function readAnswerRows(runQuery: RunRawQuery, query: string | undefined): Promise<AnswerRows | undefined> {
+  if (!query)
+    return undefined;
+  try {
+    return await readCapped(await runQuery(query), ANSWER_CAPS);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
 
 export interface AgentClientOptions {
   /** How to run a query on the iModel: `queryRunner(imodel)`. Absent for questions about ECSql alone. */
@@ -42,9 +59,9 @@ export interface AgentClientOptions {
 export interface AskOptions {
   /** The text in the host's query editor, if any. */
   editorText?: string;
-  /** Earlier questions and answers of this chat, so a follow-up has their context. */
-  history?: readonly ChatMessage[];
-  /** Findings carried over from earlier questions of this chat. */
+  /** The chat's earlier questions (`earlierQuestion`), so a follow-up has their context. */
+  earlier?: readonly EarlierQuestion[];
+  /** Notes carried over from earlier questions of this chat. Private: kept and sent back, never shown. */
   notes?: readonly Note[];
   onStatus?: (status: AgentStatus) => void;
   onStep?: (step: TranscriptStep) => void;
@@ -93,7 +110,7 @@ export class AgentClient {
    * Read a query's rows on the iModel, up to the caps given: for a host that shows an answer's
    * results. Throws when there is no iModel, or the query fails.
    */
-  public async read(ecsql: string, caps: ResultCaps = { maxRows: 200, maxChars: 200_000, maxCellChars: 400 }): Promise<Pick<QueryRows, "columns" | "rows" | "clipped" | "truncatedBy">> {
+  public async read(ecsql: string, caps: ResultCaps = ANSWER_CAPS): Promise<Pick<QueryRows, "columns" | "rows" | "clipped" | "truncatedBy">> {
     if (!this.options.runQuery)
       throw new Error("No iModel is open.");
     return readCapped(await this.options.runQuery(ecsql), caps);
@@ -109,13 +126,23 @@ export class AgentClient {
       runQuery,
       imodel: imodelName !== undefined ? { name: imodelName, startup } : undefined,
       editorText: options.editorText,
-      history: options.history,
+      earlier: options.earlier,
       notes: options.notes,
       onStep: options.onStep,
       onNote: options.onNote,
       onPhase: (phase, ecsql) => options.onStatus?.(phase === "querying" ? { phase, ecsql: ecsql ?? "" } : { phase }),
       signal: options.signal,
     };
-    return driveTurns(question, client, this.turns);
+    const run = await driveTurns(question, client, this.turns);
+    const answerRows = await this.answerRows(run.structured?.query || run.query);
+    return answerRows ? { ...run, answerRows } : run;
+  }
+
+  /**
+   * The answer's query's rows, read once when the run ends: the host shows them, and a later
+   * question of the chat sends the first of them (`earlierQuestion`).
+   */
+  private async answerRows(query: string | undefined): Promise<AnswerRows | undefined> {
+    return this.options.runQuery ? readAnswerRows(this.options.runQuery, query) : undefined;
   }
 }

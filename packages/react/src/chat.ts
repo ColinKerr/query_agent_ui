@@ -1,4 +1,4 @@
-import type { AgentRun, ChatMessage, Note } from "@query-agent/client";
+import { earlierQuestion, type AgentRun, type EarlierQuestion, type Note } from "@query-agent/client";
 
 /** One question and what came of it. */
 export interface ChatTurn {
@@ -15,19 +15,20 @@ export interface ChatTurn {
   run?: AgentRun;
 }
 
-/** A chat: its questions in order. The earlier runs' messages and notes give a follow-up its context. */
+/** A chat: its questions in order. The earlier questions and the notes give a follow-up its context. */
 export interface Chat {
   turns: ChatTurn[];
 }
 
-/** The messages and notes of the last finished run, which carry the whole chat so far. */
-export function contextOf(chat: Chat): { history: ChatMessage[]; notes: Note[] } {
-  for (let i = chat.turns.length - 1; i >= 0; i--) {
-    const run = chat.turns[i].run;
-    if (run)
-      return { history: run.messages, notes: run.notes };
-  }
-  return { history: [], notes: [] };
+/**
+ * What a follow-up is told of the chat so far: each earlier question as the user saw it, with what
+ * its run found, and the notes of the last finished run, which carry the whole chat's. Never the
+ * earlier runs' messages or steps. A question that failed is left out.
+ */
+export async function contextOf(chat: Chat): Promise<{ earlier: EarlierQuestion[]; notes: Note[] }> {
+  const answered = chat.turns.filter((turn): turn is ChatTurn & { run: AgentRun } => turn.run !== undefined);
+  const earlier = await Promise.all(answered.map((turn) => earlierQuestion(turn.question, turn.run)));
+  return { earlier, notes: answered.at(-1)?.run.notes ?? [] };
 }
 
 /** The failure a user is shown. The reason is in the function's log, never in its reply. */

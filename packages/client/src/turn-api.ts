@@ -1,7 +1,7 @@
 /**
  * The turn API's types: everything that travels between the client and the function.
  *
- * The REST API document is `plan/Query_Agent_Turn_API.md`. This module imports nothing, so the
+ * The REST API document is `docs/turn-api.md` in query_agent_function. This module imports nothing, so the
  * public UI repository can carry a copy of it as it is (the split plan allows the types to be
  * duplicated there). Change both together, and raise `TURN_VERSION` when a change is not
  * backward compatible.
@@ -118,6 +118,40 @@ export interface StartupResult {
 
 export type StopReason = "answered" | "stuck" | "steps" | "aborted";
 
+/**
+ * How much of an answer's rows an earlier question keeps for the questions after it. Smaller than a
+ * live result: enough for a count, a short list, or the top of a long one.
+ */
+export const HISTORY_CAPS: ResultCaps = { maxRows: 20, maxChars: 2_000, maxCellChars: 200 };
+
+/**
+ * What a run found, for the questions after it. The function makes it from the run's steps when
+ * the run ends. Private: the client keeps it and sends it back with the question, and never shows
+ * or reads it.
+ */
+export interface RunFound {
+  /** The classes in FROM and JOIN of the queries that returned rows, as written (`Schema:Class`). */
+  classes: string[];
+  /** The properties those queries read, as `Class.Property` where the class is known. */
+  properties: string[];
+  /** The queries that failed or returned no rows, shortened, and why. Oldest first. */
+  failed: { query: string; why: string }[];
+  /** The `getDocSection` refs that found a section. */
+  sections: string[];
+}
+
+/** An earlier question of the chat, as the user saw it, with what its run found. */
+export interface EarlierQuestion {
+  question: string;
+  answer: string;
+  query?: string;
+  /** The answer's query's rows, cut to `HISTORY_CAPS`, or its error. */
+  rows?: Pick<QueryRows, "columns" | "rows" | "clipped" | "truncatedBy" | "error">;
+  stoppedBecause: StopReason;
+  /** As `done.found` gave it. Private. */
+  found?: RunFound;
+}
+
 export interface SubmittedAnswer {
   explanation: string;
   query: string;
@@ -159,8 +193,13 @@ export interface TurnRequest {
   /** What is in the query editor, which is context for "fix this" and "what does this do". */
   editorText?: string;
   /**
-   * The conversation so far, without the system message, which the function rebuilds every
-   * turn: the earlier questions of the chat, then this run's messages.
+   * The chat's earlier questions, oldest first. The function writes them into the conversation on
+   * every turn of the run, shortened to fit, and never returns them.
+   */
+  earlier?: EarlierQuestion[];
+  /**
+   * This run's messages so far, without the system message, which the function rebuilds every
+   * turn. A client that sends no `earlier` may instead put the earlier questions' messages first.
    */
   messages: ChatMessage[];
   /** This run's steps so far. */
@@ -188,6 +227,8 @@ export interface TurnDone {
   systemPrompt: string;
   /** Research skills loaded during the run, in order, when they were on. */
   skillsLoaded?: LoadedSkill[];
+  /** What the run found, for the questions after it. Private: send it back as the earlier question's `found`. */
+  found?: RunFound;
 }
 
 /** What the function sends back for one turn. */

@@ -9,7 +9,7 @@
 .qa-progress, .qa-muted, .qa-notice { color: var(--qa-muted, #666); }
 .qa-error { color: var(--qa-error, #a40000); }
 .qa-dots { display: inline-block; width: 1.5em; }
-.qa-query pre, .qa-steps pre { margin: 6px 0; padding: 6px; overflow-x: auto; background: var(--qa-code-bg, #fff); border: 1px solid var(--qa-border, #ddd); border-radius: 4px; }
+.qa-query pre { margin: 6px 0; padding: 6px; overflow-x: auto; background: var(--qa-code-bg, #fff); border: 1px solid var(--qa-border, #ddd); border-radius: 4px; }
 .qa-compose { border-top: 1px solid var(--qa-border, #ddd); padding: 8px; display: flex; flex-direction: column; gap: 6px; }
 .qa-input { width: 100%; box-sizing: border-box; font: inherit; resize: vertical; }
 .qa-controls { display: flex; gap: 6px; justify-content: flex-end; }
@@ -23,8 +23,6 @@
 .qa-workbench-side { flex: 2 1 0; min-width: 0; overflow-y: auto; border-left: 1px solid var(--qa-border, #ddd); padding: 0 8px; }
 .qa-tabs { display: flex; gap: 4px; position: sticky; top: 0; background: var(--qa-bg, #fff); padding: 6px 0; }
 .qa-tabs [aria-selected="true"] { font-weight: 600; }
-.qa-steps { padding-left: 1.4em; }
-.qa-step-failed .qa-step-tool { color: var(--qa-error, #a40000); }
 .qa-results table { border-collapse: collapse; font-size: 0.9em; }
 .qa-results th, .qa-results td { border: 1px solid var(--qa-border, #ddd); padding: 2px 6px; text-align: left; vertical-align: top; }
 /* By the control's own width, not the window's: it often sits in a side pane. */

@@ -1,22 +1,23 @@
 /**
- * The larger control: the chat, with what the agent did beside it. It adds the steps of the open
- * run (each query with its result), the notes the agent kept, the earlier chats of this page, and
- * the answer's results read through the same client. It has no query editor of its own: a query
- * goes to the host's editor (`onUseQuery`).
+ * The larger control: the chat, with the answer's results and the earlier chats of this page
+ * beside it. It has no query editor of its own: a query goes to the host's editor (`onUseQuery`).
+ *
+ * It shows nothing of how the agent worked: no steps, no notes. Those are the agent's private
+ * data, which the client keeps for the next question and never shows.
  */
 
-import { useEffect, useState } from "react";
-import type { AgentStatus, QueryRows } from "@query-agent/client";
+import { useState } from "react";
+import type { AnswerRows } from "@query-agent/client";
 import { AgentChat, type AgentChatProps } from "./AgentChat";
 import type { Chat } from "./chat";
 
 export type AgentWorkbenchProps = Omit<AgentChatProps, "renderAfterAnswer" | "renderAfterChat" | "initialChat">;
 
-type Tab = "steps" | "notes" | "results" | "history";
+type Tab = "results" | "history";
 
-function ResultsTable(props: { rows?: Pick<QueryRows, "columns" | "rows" | "truncatedBy">; error?: string }): JSX.Element {
-  if (props.error)
-    return <div className="qa-error">{props.error}</div>;
+function ResultsTable(props: { rows?: AnswerRows }): JSX.Element {
+  if (props.rows?.error !== undefined)
+    return <div className="qa-error">{props.rows.error}</div>;
   if (!props.rows)
     return <div className="qa-muted">No results yet.</div>;
   const { columns = [], rows = [], truncatedBy } = props.rows;
@@ -36,25 +37,10 @@ export function AgentWorkbench(props: AgentWorkbenchProps): JSX.Element {
   const [chat, setChat] = useState<Chat>({ turns: [] });
   const [history, setHistory] = useState<Chat[]>([]);
   const [opened, setOpened] = useState<{ chat: Chat; key: number }>({ chat: { turns: [] }, key: 0 });
-  const [tab, setTab] = useState<Tab>("steps");
-  const [status, setStatus] = useState<AgentStatus | undefined>();
-  const [results, setResults] = useState<{ rows?: Pick<QueryRows, "columns" | "rows" | "truncatedBy">; error?: string }>({});
+  const [tab, setTab] = useState<Tab>("results");
 
+  // The answer's results: read by the client once, when the run ended.
   const last = [...chat.turns].reverse().find((turn) => turn.run);
-  const run = last?.run;
-
-  // The answer's results, read again through the client when a new answer arrives.
-  useEffect(() => {
-    if (!client || !last?.query) {
-      setResults({});
-      return;
-    }
-    let current = true;
-    client.read(last.query).then((rows) => current && setResults({ rows }), (err: unknown) => current && setResults({ error: err instanceof Error ? err.message : String(err) }));
-    return () => {
-      current = false;
-    };
-  }, [client, last?.query]);
 
   const changed = (next: Chat): void => {
     // "New chat" empties the chat: the one before goes into the history.
@@ -80,41 +66,17 @@ export function AgentWorkbench(props: AgentWorkbenchProps): JSX.Element {
           client={client}
           initialChat={opened.chat}
           onChange={changed}
-          onStatus={(next) => {
-            setStatus(next);
-            chatProps.onStatus?.(next);
-          }}
         />
       </div>
       <div className="qa-workbench-side">
         <div className="qa-tabs" role="tablist">
-          {(["steps", "notes", "results", "history"] as Tab[]).map((name) => (
+          {(["results", "history"] as Tab[]).map((name) => (
             <button type="button" role="tab" aria-selected={tab === name} key={name} onClick={() => setTab(name)}>
-              {{ steps: "Steps", notes: "Notes", results: "Results", history: "History" }[name]}
+              {{ results: "Results", history: "History" }[name]}
             </button>
           ))}
         </div>
-        {tab === "steps" && (
-          <ol className="qa-steps">
-            {(run?.steps ?? []).map((step, i) => (
-              <li key={i} className={step.failed ? "qa-step-failed" : undefined}>
-                <div className="qa-step-tool">{step.tool}{step.failed ? " (failed)" : ""}</div>
-                {step.tool === "runQuery"
-                  ? <pre><code>{(JSON.parse(step.arguments) as { ecsql?: string }).ecsql}</code></pre>
-                  : <pre><code>{step.arguments}</code></pre>}
-                <details><summary>Result</summary><pre>{step.result}</pre></details>
-              </li>
-            ))}
-            {!run && <li className="qa-muted">{status ? "The run is in progress." : "Ask a question to see the agent's steps."}</li>}
-          </ol>
-        )}
-        {tab === "notes" && (
-          <ul className="qa-notes">
-            {(run?.notes ?? []).map((note, i) => <li key={i}>{note.text}</li>)}
-            {(run?.notes.length ?? 0) === 0 && <li className="qa-muted">No notes.</li>}
-          </ul>
-        )}
-        {tab === "results" && <ResultsTable {...results} />}
+        {tab === "results" && <ResultsTable rows={last?.run?.answerRows} />}
         {tab === "history" && (
           <ul className="qa-history">
             {history.map((earlier, i) => (

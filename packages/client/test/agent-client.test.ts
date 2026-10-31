@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AgentClient, type AgentStatus } from "../src/agent-client";
-import type { StartupList } from "../src/client";
+import { earlierQuestion, type StartupList } from "../src/client";
+import { HISTORY_CAPS } from "../src/turn-api";
 import { fakeQueries, response, scriptedTurns } from "./helpers";
 
 const list: StartupList = { lists: {}, queries: [{ rule: "r", id: "count", ecsql: "SELECT COUNT(*) FROM e" }] };
@@ -34,5 +35,21 @@ describe("AgentClient", () => {
 
   it("needs a function URL or a way to send turns", () => {
     expect(() => AgentClient.start({})).toThrow(/functionUrl/);
+  });
+});
+
+describe("earlierQuestion", () => {
+  it("keeps the answer's rows only up to HISTORY_CAPS, and a cut cell's full length", async () => {
+    const long = "x".repeat(300);
+    const run = {
+      answer: "A.", query: "SELECT v FROM t", steps: [], notes: [], messages: [], systemPrompt: "", stoppedBecause: "answered" as const, usage: { requests: 1 },
+      answerRows: { columns: ["v"], rows: [[`${long.slice(0, 250)}`], ...Array.from({ length: 30 }, (_, i) => [i])], clipped: [[0, 0, 900]] as [number, number, number][] },
+    };
+    const earlier = await earlierQuestion("q", run);
+    expect(earlier.rows?.rows?.length).toBeLessThanOrEqual(HISTORY_CAPS.maxRows);
+    expect(earlier.rows?.truncatedBy).toBeDefined();
+    expect(earlier.rows?.clipped).toEqual([[0, 0, 900]]);
+    expect(String(earlier.rows?.rows?.[0][0]).length).toBe(HISTORY_CAPS.maxCellChars);
+    expect(await earlierQuestion("q", { ...run, answerRows: { error: "bad" } })).toMatchObject({ rows: { error: "bad" } });
   });
 });

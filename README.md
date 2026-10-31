@@ -10,7 +10,7 @@ between them is `docs/turn-api.md` in `query_agent_function`.
 | Package | Holds |
 |---|---|
 | `packages/client` | `AgentClient`, the query runner, the turn driver, the startup query list, and the API types |
-| `packages/react` | `AgentChat` (the chat and the ask box), `AgentWorkbench` (the chat with the steps, notes, results and earlier chats beside it), and the feedback form |
+| `packages/react` | `AgentChat` (the chat and the ask box), `AgentWorkbench` (the chat with the answer's results and earlier chats beside it; it shows nothing of how the agent worked), and the feedback form |
 
 ### Use the client
 

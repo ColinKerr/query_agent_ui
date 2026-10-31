@@ -28,7 +28,7 @@ export interface AgentChatProps {
   onFeedback?: (feedback: Feedback) => void | Promise<void>;
   /** Drawn under each finished answer, in place of the feedback form. */
   renderAfterAnswer?: (turn: ChatTurn, index: number) => ReactNode;
-  /** Drawn after the questions, such as the steps of the last run. */
+  /** Drawn after the questions. */
   renderAfterChat?: (chat: Chat, status: AgentStatus | undefined) => ReactNode;
   /** Called with each status and step while a run is in progress. */
   onStatus?: (status: AgentStatus | undefined) => void;
@@ -87,7 +87,7 @@ export function AgentChat(props: AgentChatProps): JSX.Element {
     let turn: ChatTurn;
     try {
       const run = await client.ask(text, {
-        ...contextOf(before),
+        ...(await contextOf(before)),
         editorText: editorText?.(),
         signal: controller.signal,
         onStatus: report,

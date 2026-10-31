@@ -38,15 +38,34 @@ describe("AgentChat", () => {
     expect(onUseQuery).toHaveBeenCalledWith("SELECT COUNT(*) FROM e");
   });
 
-  it("sends the first run's messages with a follow-up question", async () => {
-    const turns = scriptedTurns([response([], { answer: "First." }), response([], { answer: "Second." })]);
-    const { container } = mount(<AgentChat client={AgentClient.start({ turns })} />);
-    ask(container, "one");
-    await settle();
-    ask(container, "two");
-    await settle();
-    expect(turns.requests[1].messages.map((m) => m.content)).toContain("First.");
-    expect([...container.querySelectorAll(".qa-answer-text")].map((e) => e.textContent)).toEqual(["First.", "Second."]);
+  it("sends a follow-up the earlier question as the user saw it, with what its run found, and none of its messages or steps", async () => {
+    const step = { tool: "runQuery", arguments: JSON.stringify({ ecsql: "SELECT COUNT(*) FROM s.Pipe" }), result: "columns: [\"n\"]\n[3]", failed: false, ms: 1 };
+    const first = response(["SELECT COUNT(*) FROM s.Pipe"]);
+    first.steps = [step];
+    first.notes = [{ text: "Pipes are s.Pipe.", at: "t" }];
+    const answered = response([], { answer: "There are 3.", query: "SELECT COUNT(*) FROM s.Pipe" });
+    answered.done!.found = { classes: ["s.Pipe"], properties: [], failed: [], sections: [] };
+    const turns = scriptedTurns([first, answered, response([], { answer: "Second." })]);
+    const client = AgentClient.start({ turns, runQuery: async () => rows([[3]]), startupList: { lists: {}, queries: [] } });
+    const { container } = mount(<AgentChat client={client} />);
+    ask(container, "How many pipes?");
+    await settle(10);
+    ask(container, "And valves?");
+    await settle(10);
+
+    const followUp = turns.requests[2];
+    expect(followUp.question).toBe("And valves?");
+    expect(followUp.messages).toEqual([]);
+    expect(followUp.steps).toEqual([]);
+    expect(followUp.earlier).toEqual([{
+      question: "How many pipes?", answer: "There are 3.", query: "SELECT COUNT(*) FROM s.Pipe",
+      rows: { columns: ["n"], rows: [[3]] }, stoppedBecause: "answered", found: { classes: ["s.Pipe"], properties: [], failed: [], sections: [] },
+    }]);
+    expect(followUp.notes).toEqual([{ text: "Pipes are s.Pipe.", at: "t" }]);
+    expect([...container.querySelectorAll(".qa-answer-text")].map((e) => e.textContent)).toEqual(["There are 3.", "Second."]);
+    // The notes and what the run found are private: nothing shows them.
+    expect(container.textContent).not.toContain("Pipes are s.Pipe.");
+    expect(container.textContent).not.toContain("s.Pipe\"");
   });
 
   it("stops a run when asked, and shows what the agent had", async () => {

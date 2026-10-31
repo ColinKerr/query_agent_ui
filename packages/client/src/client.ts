@@ -9,8 +9,8 @@
 
 import { readCapped, type RunRawQuery } from "./caps";
 import {
-  TURN_VERSION, type ChatMessage, type LoadedSkill, type Note, type QueryRows, type ResultCaps, type StartupResult, type StopReason,
-  type SubmittedAnswer, type TokenUsage, type TranscriptStep, type TurnRequest, type TurnResponse, type TurnState,
+  HISTORY_CAPS, TURN_VERSION, type ChatMessage, type EarlierQuestion, type LoadedSkill, type Note, type QueryRows, type ResultCaps, type RunFound,
+  type StartupResult, type StopReason, type SubmittedAnswer, type TokenUsage, type TranscriptStep, type TurnRequest, type TurnResponse, type TurnState,
 } from "./turn-api";
 
 /** What the client supplies to a run, wherever the function runs. */
@@ -20,9 +20,9 @@ export interface ClientOptions {
   /** The open iModel: its name, and the rows of the startup query list (`runStartupQueries`), run once per iModel. */
   imodel?: { name: string; startup?: StartupResult[] };
   editorText?: string;
-  /** Earlier turns of this chat, excluding the system message, which is rebuilt each turn. */
-  history?: readonly ChatMessage[];
-  /** Notes carried over from earlier turns. */
+  /** The chat's earlier questions, oldest first (`earlierQuestion`). The function shortens them to fit. */
+  earlier?: readonly EarlierQuestion[];
+  /** Notes carried over from earlier questions. Private: kept and sent back, never shown. */
   notes?: readonly Note[];
   onStep?: (step: TranscriptStep) => void;
   onNote?: (note: Note) => void;
@@ -57,6 +57,48 @@ export interface AgentRun {
   skillsLoaded?: LoadedSkill[];
   /** Requests to the model, and the tokens the endpoint reported for them (absent when it reported none). */
   usage: { requests: number; tokens?: TokenUsage };
+  /** What the run found, for the questions after it. Private: sent back with the question, never shown. */
+  found?: RunFound;
+  /** The answer's query's rows, read once when the run ended (`AgentClient.ask`), or its error. */
+  answerRows?: AnswerRows;
+}
+
+/** An answer's query's rows, as the client read them, or the error it gave. */
+export type AnswerRows = Pick<QueryRows, "columns" | "rows" | "clipped" | "truncatedBy" | "error">;
+
+/**
+ * An answered question as a later question of the chat sends it: as the user saw it, with the
+ * answer's rows cut to `HISTORY_CAPS`, and what its run found.
+ */
+export async function earlierQuestion(question: string, run: AgentRun): Promise<EarlierQuestion> {
+  const query = run.structured?.query || run.query;
+  return {
+    question,
+    answer: run.answer,
+    ...(query ? { query } : {}),
+    ...(run.answerRows ? { rows: await historyRows(run.answerRows) } : {}),
+    stoppedBecause: run.stoppedBecause,
+    ...(run.found ? { found: run.found } : {}),
+  };
+}
+
+/**
+ * Rows read with the live caps, cut again to `HISTORY_CAPS`, by the same rule as a read. A cell the
+ * first read already cut keeps its full length.
+ */
+async function historyRows(read: AnswerRows): Promise<AnswerRows> {
+  if (read.error !== undefined)
+    return { error: read.error };
+  const cut = await readCapped({ columns: read.columns ?? [], rows: (async function* () { yield* read.rows ?? []; })() }, HISTORY_CAPS);
+  const before = new Map((read.clipped ?? []).map(([row, column, length]) => [`${row},${column}`, length]));
+  const clipped = (cut.clipped ?? []).map(([row, column, length]): [number, number, number] => [row, column, before.get(`${row},${column}`) ?? length]);
+  for (const [key, length] of before) {
+    const [row, column] = key.split(",").map(Number);
+    if (row < (cut.rows?.length ?? 0) && !clipped.some(([r, c]) => r === row && c === column))
+      clipped.push([row, column, length]);
+  }
+  const truncatedBy = cut.truncatedBy ?? read.truncatedBy;
+  return { columns: cut.columns, rows: cut.rows, ...(clipped.length > 0 ? { clipped } : {}), ...(truncatedBy ? { truncatedBy } : {}) };
 }
 
 /** One call to the function: over HTTP (`fetchTurns`), or in the same process, for tests and training. */
@@ -69,7 +111,7 @@ export type TurnCall = (request: TurnRequest, signal?: AbortSignal) => Promise<T
  */
 export async function driveTurns(question: string, client: ClientOptions, turn: TurnCall): Promise<AgentRun> {
   const { runQuery } = client;
-  let messages: ChatMessage[] = [...(client.history ?? [])];
+  let messages: ChatMessage[] = [];
   let steps: TranscriptStep[] = [];
   let notes: Note[] = [...(client.notes ?? [])];
   let state: TurnState | undefined;
@@ -77,6 +119,7 @@ export async function driveTurns(question: string, client: ClientOptions, turn: 
   for (;;) {
     const request: TurnRequest = {
       version: TURN_VERSION, question, canQuery: runQuery !== undefined, imodel: client.imodel, editorText: client.editorText,
+      ...(client.earlier && client.earlier.length > 0 ? { earlier: [...client.earlier] } : {}),
       messages, steps, notes, state, results, ...(client.signal?.aborted ? { aborted: true } : {}),
     };
     client.onPhase?.("thinking");
@@ -102,6 +145,7 @@ export async function driveTurns(question: string, client: ClientOptions, turn: 
         stoppedBecause: done.stoppedBecause,
         usage: state.usage,
         ...(done.structured ? { structured: done.structured } : {}),
+        ...(done.found ? { found: done.found } : {}),
       };
     }
     results = [];
