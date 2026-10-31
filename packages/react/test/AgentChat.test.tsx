@@ -44,7 +44,7 @@ describe("AgentChat", () => {
     first.steps = [step];
     first.notes = [{ text: "Pipes are s.Pipe.", at: "t" }];
     const answered = response([], { answer: "There are 3.", query: "SELECT COUNT(*) FROM s.Pipe" });
-    answered.done!.found = { classes: ["s.Pipe"], properties: [], failed: [], sections: [] };
+    answered.done!.found = { classes: ["s.Pipe"], properties: [], failed: [] };
     const turns = scriptedTurns([first, answered, response([], { answer: "Second." })]);
     const client = AgentClient.start({ turns, runQuery: async () => rows([[3]]), startupList: { lists: {}, queries: [] } });
     const { container } = mount(<AgentChat client={client} />);
@@ -59,7 +59,7 @@ describe("AgentChat", () => {
     expect(followUp.steps).toEqual([]);
     expect(followUp.earlier).toEqual([{
       question: "How many pipes?", answer: "There are 3.", query: "SELECT COUNT(*) FROM s.Pipe",
-      rows: { columns: ["n"], rows: [[3]] }, stoppedBecause: "answered", found: { classes: ["s.Pipe"], properties: [], failed: [], sections: [] },
+      rows: { columns: ["n"], rows: [[3]] }, stoppedBecause: "answered", found: { classes: ["s.Pipe"], properties: [], failed: [] },
     }]);
     expect(followUp.notes).toEqual([{ text: "Pipes are s.Pipe.", at: "t" }]);
     expect([...container.querySelectorAll(".qa-answer-text")].map((e) => e.textContent)).toEqual(["There are 3.", "Second."]);

@@ -136,8 +136,6 @@ export interface RunFound {
   properties: string[];
   /** The queries that failed or returned no rows, shortened, and why. Oldest first. */
   failed: { query: string; why: string }[];
-  /** The `getDocSection` refs that found a section. */
-  sections: string[];
 }
 
 /** An earlier question of the chat, as the user saw it, with what its run found. */
