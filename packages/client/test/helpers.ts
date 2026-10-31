@@ -1,5 +1,5 @@
 import type { RawQueryResult, RunRawQuery } from "../src/caps";
-import { TURN_VERSION, type TurnRequest, type TurnResponse } from "../src/turn-api";
+import type { TurnRequest, TurnResponse } from "../src/turn-api";
 
 export function rows(columns: string[], data: unknown[][]): RawQueryResult {
   return { columns, rows: (async function* () { yield* data; })() };
@@ -24,11 +24,14 @@ export function fakeQueries(table: Record<string, unknown[][]>, delayMs = 0): Ru
 export const CAPS = { maxRows: 200, maxChars: 12_000, maxCellChars: 400 };
 
 /** A response: the queries to run, or the end of the run with an answer. */
+let sealed = 0;
+
+/** A response: the queries to run, or the end of the run with an answer. Each has a new opaque token. */
 export function response(queries: string[], done?: { answer: string; query?: string }): TurnResponse {
+  sealed++;
   return {
-    version: TURN_VERSION, messages: [{ role: "assistant", content: done?.answer ?? "" }], steps: [], notes: [],
-    state: { usage: { requests: 1 } } as TurnResponse["state"], queries, caps: CAPS,
-    ...(done ? { done: { answer: done.answer, query: done.query, stoppedBecause: "answered", systemPrompt: "prompt" } as TurnResponse["done"] } : {}),
+    token: `sealed-${sealed}`, queries, caps: CAPS,
+    ...(done ? { done: { answer: done.answer, ...(done.query ? { query: done.query } : {}), stoppedBecause: "answered", runId: `run-${sealed}` } } : {}),
   };
 }
 

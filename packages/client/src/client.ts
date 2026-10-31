@@ -9,8 +9,8 @@
 
 import { readCapped, type RunRawQuery } from "./caps";
 import {
-  HISTORY_CAPS, TURN_VERSION, type ChatMessage, type EarlierQuestion, type LoadedSkill, type Note, type QueryRows, type ResultCaps, type RunFound,
-  type StartupResult, type StopReason, type SubmittedAnswer, type TokenUsage, type TranscriptStep, type TurnRequest, type TurnResponse, type TurnState,
+  HISTORY_CAPS, type EarlierQuestion, type QueryRows, type ResultCaps, type StartupResult, type StopReason, type SubmittedAnswer,
+  type TurnRequest, type TurnResponse,
 } from "./turn-api";
 
 /** What the client supplies to a run, wherever the function runs. */
@@ -22,43 +22,26 @@ export interface ClientOptions {
   editorText?: string;
   /** The chat's earlier questions, oldest first (`earlierQuestion`). The function shortens them to fit. */
   earlier?: readonly EarlierQuestion[];
-  /** Notes carried over from earlier questions. Private: kept and sent back, never shown. */
-  notes?: readonly Note[];
-  onStep?: (step: TranscriptStep) => void;
-  onNote?: (note: Note) => void;
+  /** The token of the chat's last finished run. Opaque: kept and sent back, never read. */
+  token?: string;
   /** Called before each turn is sent (`thinking`), and before each query runs (`querying`, with its ECSql). */
   onPhase?: (phase: "thinking" | "querying", ecsql?: string) => void;
   signal?: AbortSignal;
 }
 
-/** The finished run, as the client keeps it. */
+/** The finished run, as the client keeps it: the answer, and what the chat's next question needs. */
 export interface AgentRun {
   /** The final prose answer, which should carry exactly one fenced sql block. */
   answer: string;
   /** The query pulled out of the answer, if there was one. */
   query?: string;
-  steps: TranscriptStep[];
-  notes: Note[];
-  /** The conversation, for persistence and for the next turn. */
-  messages: ChatMessage[];
-  /**
-   * The system prompt as last sent.
-   *
-   * Kept so a transcript explains itself without the repository beside it: the prompt is the
-   * thing being tuned, and a transcript that does not carry it cannot be compared against one
-   * produced by different assets. The last turn's is the interesting one -- it has every
-   * finding the run accumulated.
-   */
-  systemPrompt: string;
   stoppedBecause: StopReason;
   /** The answer as submitted with `submitAnswer`, when the run ended that way. */
   structured?: SubmittedAnswer;
-  /** Research skills loaded during the run, in order, when they were on. */
-  skillsLoaded?: LoadedSkill[];
-  /** Requests to the model, and the tokens the endpoint reported for them (absent when it reported none). */
-  usage: { requests: number; tokens?: TokenUsage };
-  /** What the run found, for the questions after it. Private: sent back with the question, never shown. */
-  found?: RunFound;
+  /** Names the run's record, where the function keeps one. */
+  runId: string;
+  /** The token for the chat's next question. Opaque: the agent's own state, sealed. */
+  token: string;
   /** The answer's query's rows, read once when the run ended (`AgentClient.ask`), or its error. */
   answerRows?: AnswerRows;
 }
@@ -68,7 +51,7 @@ export type AnswerRows = Pick<QueryRows, "columns" | "rows" | "clipped" | "trunc
 
 /**
  * An answered question as a later question of the chat sends it: as the user saw it, with the
- * answer's rows cut to `HISTORY_CAPS`, and what its run found.
+ * answer's rows cut to `HISTORY_CAPS`.
  */
 export async function earlierQuestion(question: string, run: AgentRun): Promise<EarlierQuestion> {
   const query = run.structured?.query || run.query;
@@ -78,7 +61,6 @@ export async function earlierQuestion(question: string, run: AgentRun): Promise<
     ...(query ? { query } : {}),
     ...(run.answerRows ? { rows: await historyRows(run.answerRows) } : {}),
     stoppedBecause: run.stoppedBecause,
-    ...(run.found ? { found: run.found } : {}),
   };
 }
 
@@ -111,41 +93,28 @@ export type TurnCall = (request: TurnRequest, signal?: AbortSignal) => Promise<T
  */
 export async function driveTurns(question: string, client: ClientOptions, turn: TurnCall): Promise<AgentRun> {
   const { runQuery } = client;
-  let messages: ChatMessage[] = [];
-  let steps: TranscriptStep[] = [];
-  let notes: Note[] = [...(client.notes ?? [])];
-  let state: TurnState | undefined;
+  let token = client.token;
   let results: QueryRows[] | undefined;
   for (;;) {
     const request: TurnRequest = {
-      version: TURN_VERSION, question, canQuery: runQuery !== undefined, imodel: client.imodel, editorText: client.editorText,
+      question, canQuery: runQuery !== undefined, imodel: client.imodel, editorText: client.editorText,
       ...(client.earlier && client.earlier.length > 0 ? { earlier: [...client.earlier] } : {}),
-      messages, steps, notes, state, results, ...(client.signal?.aborted ? { aborted: true } : {}),
+      ...(token ? { token } : {}),
+      ...(results ? { results } : {}),
+      ...(client.signal?.aborted ? { aborted: true } : {}),
     };
     client.onPhase?.("thinking");
-    const response = await turn(request, client.signal);
-    messages = [...messages, ...response.messages];
-    steps = [...steps, ...response.steps];
-    notes = [...notes, ...response.notes];
-    for (const step of response.steps)
-      client.onStep?.(step);
-    for (const note of response.notes)
-      client.onNote?.(note);
-    state = response.state;
+    const response: TurnResponse = await turn(request, client.signal);
+    token = response.token;
     const done = response.done;
     if (done) {
       return {
-        ...(done.skillsLoaded ? { skillsLoaded: done.skillsLoaded } : {}),
         answer: done.answer,
-        query: done.query,
-        steps,
-        notes,
-        messages,
-        systemPrompt: done.systemPrompt,
+        ...(done.query ? { query: done.query } : {}),
         stoppedBecause: done.stoppedBecause,
-        usage: state.usage,
         ...(done.structured ? { structured: done.structured } : {}),
-        ...(done.found ? { found: done.found } : {}),
+        runId: done.runId,
+        token: response.token,
       };
     }
     results = [];

@@ -11,7 +11,7 @@
 import { readCapped, type RunRawQuery } from "./caps";
 import { driveTurns, fetchTurns, runStartupQueries, type AgentRun, type AnswerRows, type ClientOptions, type StartupList, type TurnCall } from "./client";
 import defaultList from "./startup-queries.json";
-import type { EarlierQuestion, Note, QueryRows, ResultCaps, StartupResult, TranscriptStep } from "./turn-api";
+import type { EarlierQuestion, QueryRows, ResultCaps, StartupResult } from "./turn-api";
 
 /** The library's startup query list (`startup-queries.json`): what a client runs when it starts. */
 export const DEFAULT_STARTUP_LIST = defaultList as StartupList;
@@ -61,11 +61,9 @@ export interface AskOptions {
   editorText?: string;
   /** The chat's earlier questions (`earlierQuestion`), so a follow-up has their context. */
   earlier?: readonly EarlierQuestion[];
-  /** Notes carried over from earlier questions of this chat. Private: kept and sent back, never shown. */
-  notes?: readonly Note[];
+  /** The token of the chat's last finished run (`AgentRun.token`). Opaque: kept and sent back, never read. */
+  token?: string;
   onStatus?: (status: AgentStatus) => void;
-  onStep?: (step: TranscriptStep) => void;
-  onNote?: (note: Note) => void;
   signal?: AbortSignal;
 }
 
@@ -127,9 +125,7 @@ export class AgentClient {
       imodel: imodelName !== undefined ? { name: imodelName, startup } : undefined,
       editorText: options.editorText,
       earlier: options.earlier,
-      notes: options.notes,
-      onStep: options.onStep,
-      onNote: options.onNote,
+      token: options.token,
       onPhase: (phase, ecsql) => options.onStatus?.(phase === "querying" ? { phase, ecsql: ecsql ?? "" } : { phase }),
       signal: options.signal,
     };

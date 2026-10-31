@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import * as http from "node:http";
 import { driveTurns, fetchTurns, runStartupQueries, type StartupList } from "../src/client";
-import { TURN_VERSION, type TurnRequest } from "../src/turn-api";
+import type { TurnRequest } from "../src/turn-api";
 import { CAPS, fakeQueries, response, scriptedTurns } from "./helpers";
 
 let server: http.Server | undefined;
@@ -16,7 +16,7 @@ describe("driveTurns", () => {
     const phases: string[] = [];
     const run = await driveTurns("q", { runQuery: fakeQueries({ "SELECT 1": [[1]] }), onPhase: (phase) => phases.push(phase) }, turns);
     expect(run).toMatchObject({ answer: "one", query: "SELECT 1", stoppedBecause: "answered" });
-    expect(turns.requests[0]).toMatchObject({ version: TURN_VERSION, question: "q", canQuery: true });
+    expect(turns.requests[0]).toMatchObject({ question: "q", canQuery: true });
     expect(turns.requests[1].results).toEqual([expect.objectContaining({ ecsql: "SELECT 1", columns: ["n"], rows: [[1]] })]);
     expect(phases).toEqual(["thinking", "querying", "thinking"]);
   });
@@ -50,14 +50,14 @@ describe("fetchTurns", () => {
       return [200, response([], { answer: "a" })];
     });
     const turn = fetchTurns(`${url}/`, { getAccessToken: async () => "t0k" });
-    const reply = await turn({ version: TURN_VERSION, question: "q", canQuery: false, messages: [], steps: [], notes: [] });
+    const reply = await turn({ question: "q", canQuery: false });
     expect(reply.done?.answer).toBe("a");
     expect(auth).toBe("Bearer t0k");
   });
 
   it("says when the function refuses a turn", async () => {
     const url = await serve(() => [502, { error: "The turn failed. The function's log has the reason." }]);
-    await expect(fetchTurns(url)({ version: TURN_VERSION, question: "q", canQuery: false, messages: [], steps: [], notes: [] }))
+    await expect(fetchTurns(url)({ question: "q", canQuery: false }))
       .rejects.toThrow(/HTTP 502.*function's log/);
   });
 });

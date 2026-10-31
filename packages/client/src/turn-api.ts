@@ -1,63 +1,11 @@
 /**
- * The turn API's types: everything that travels between the client and the function.
+ * The turn API's types: everything that travels between the client and the function, and nothing
+ * else. The agent's own state (its conversation with the model, its steps, notes and counters)
+ * travels only inside the sealed token, which the client cannot read (`run-state.ts`).
  *
- * The REST API document is `docs/turn-api.md` in query_agent_function. This module imports nothing, so the
- * public UI repository can carry a copy of it as it is (the split plan allows the types to be
- * duplicated there). Change both together, and raise `TURN_VERSION` when a change is not
- * backward compatible.
+ * The REST API document is `docs/turn-api.md` in query_agent_function. This module imports nothing,
+ * so the public UI repository carries a copy of it as it is. Change both together.
  */
-
-/** The version of these shapes. A function refuses a request of another version. */
-export const TURN_VERSION = 1;
-
-export type Role = "system" | "user" | "assistant" | "tool";
-
-/** A tool call as the model emitted it. */
-export interface ToolCall {
-  id: string;
-  name: string;
-  /**
-   * The argument JSON as text, not parsed.
-   *
-   * Kept raw because a local model gets this wrong often enough to matter, and the recovery is
-   * to hand the parse error back as the tool result rather than to fail the turn.
-   */
-  arguments: string;
-}
-
-export interface ChatMessage {
-  role: Role;
-  content: string;
-  /** Present on an assistant message that asked for tools. */
-  toolCalls?: ToolCall[];
-  /** Present on a tool message: which call it answers. */
-  toolCallId?: string;
-  /** The tool's name, which some endpoints require on a tool message. */
-  name?: string;
-}
-
-/** A finding the agent chose to keep. */
-export interface Note {
-  text: string;
-  at: string;
-}
-
-/** One step of what the agent did, for the reveal panel and the transcript. */
-export interface TranscriptStep {
-  tool: string;
-  arguments: string;
-  /** The text handed back to the model, after capping -- what it actually saw. */
-  result: string;
-  failed: boolean;
-  ms: number;
-}
-
-export interface TokenUsage {
-  inputTokens: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
-  outputTokens: number;
-}
 
 export interface ResultCaps {
   /** How many rows may be shown. */
@@ -104,10 +52,7 @@ export interface StartupResult {
   count: number;
   /** True when the count stopped at the guard, so there may be more. */
   guarded?: boolean;
-  /**
-   * For each row shown, its `each` value: a count, or null when it could not be run. A client from
-   * before 2026-10-28 stopped counting after 2 s and sent "not counted"; the function still reads it.
-   */
+  /** For each row shown, its `each` value: a count, or null when it could not be run. */
   each?: (string | null)[];
   /** Not run, because a query it depends on was not empty. */
   skipped?: boolean;
@@ -124,21 +69,7 @@ export type StopReason = "answered" | "stuck" | "steps" | "aborted";
  */
 export const HISTORY_CAPS: ResultCaps = { maxRows: 20, maxChars: 2_000, maxCellChars: 200 };
 
-/**
- * What a run found, for the questions after it. The function makes it from the run's steps when
- * the run ends. Private: the client keeps it and sends it back with the question, and never shows
- * or reads it.
- */
-export interface RunFound {
-  /** The classes in FROM and JOIN of the queries that returned rows, as written (`Schema:Class`). */
-  classes: string[];
-  /** The properties those queries read, as `Class.Property` where the class is known. */
-  properties: string[];
-  /** The queries that failed or returned no rows, shortened, and why. Oldest first. */
-  failed: { query: string; why: string }[];
-}
-
-/** An earlier question of the chat, as the user saw it, with what its run found. */
+/** An earlier question of the chat, as the user saw it. */
 export interface EarlierQuestion {
   question: string;
   answer: string;
@@ -146,8 +77,6 @@ export interface EarlierQuestion {
   /** The answer's query's rows, cut to `HISTORY_CAPS`, or its error. */
   rows?: Pick<QueryRows, "columns" | "rows" | "clipped" | "truncatedBy" | "error">;
   stoppedBecause: StopReason;
-  /** As `done.found` gave it. Private. */
-  found?: RunFound;
 }
 
 export interface SubmittedAnswer {
@@ -159,30 +88,8 @@ export interface SubmittedAnswer {
   via?: "labels";
 }
 
-/** A research skill that was loaded, and what loaded it: the model's choice, a default, or an event. */
-export interface LoadedSkill {
-  name: string;
-  by: "choice" | "default" | "no-class-rows" | "property-search";
-}
-
-/**
- * What the function remembers between turns that the steps and the messages do not say. The
- * client sends it back as it received it, and does not read it.
- */
-export interface TurnState {
-  /** How many times each check has spoken, and the current runs of failures. */
-  counts: Record<string, number>;
-  loaded: LoadedSkill[];
-  hintsShown: string[];
-  /** The last system prompt was built from the first `notes` notes and the first `skills` loaded skills. */
-  prompt?: { notes: number; skills: number };
-  /** Requests to the model, and the tokens the endpoint reported for them (absent when it reported none). */
-  usage: { requests: number; tokens?: TokenUsage };
-}
-
 /** What the client sends for one turn: `POST /turn`. */
 export interface TurnRequest {
-  version: number;
   question: string;
   /** Whether the client has an iModel to query. Without one, `runQuery` is not offered. */
   canQuery: boolean;
@@ -190,29 +97,20 @@ export interface TurnRequest {
   imodel?: { name: string; startup?: StartupResult[] };
   /** What is in the query editor, which is context for "fix this" and "what does this do". */
   editorText?: string;
-  /**
-   * The chat's earlier questions, oldest first. The function writes them into the conversation on
-   * every turn of the run, shortened to fit, and never returns them.
-   */
+  /** The chat's earlier questions, oldest first, as the user saw them. The same in every turn of a run. */
   earlier?: EarlierQuestion[];
   /**
-   * This run's messages so far, without the system message, which the function rebuilds every
-   * turn. A client that sends no `earlier` may instead put the earlier questions' messages first.
+   * The token from the last response: of this run, or, on a run's first turn, of the chat's last
+   * finished run. Absent on a chat's first turn. Opaque: the client stores it and sends it back.
    */
-  messages: ChatMessage[];
-  /** This run's steps so far. */
-  steps: TranscriptStep[];
-  /** The notes carried from earlier questions of the chat, then this run's. */
-  notes: Note[];
-  /** Absent on the first turn of a run. */
-  state?: TurnState;
+  token?: string;
   /** The rows, or the error, of each query the last response asked for. */
   results?: QueryRows[];
   /** The user stopped the run: the function handles the last reply's calls and ends it, with no LLM call. */
   aborted?: boolean;
 }
 
-/** What the run ends with. */
+/** What the run ends with: the answer, as the user sees it. */
 export interface TurnDone {
   /** The final prose answer, which should carry exactly one fenced sql block. */
   answer: string;
@@ -221,22 +119,14 @@ export interface TurnDone {
   /** The answer as submitted with `submitAnswer`, when the run ended that way. */
   structured?: SubmittedAnswer;
   stoppedBecause: StopReason;
-  /** The system prompt as last sent, so a transcript explains itself. */
-  systemPrompt: string;
-  /** Research skills loaded during the run, in order, when they were on. */
-  skillsLoaded?: LoadedSkill[];
-  /** What the run found, for the questions after it. Private: send it back as the earlier question's `found`. */
-  found?: RunFound;
+  /** Names the run's record, where the function keeps one (a developer's run folder). */
+  runId: string;
 }
 
 /** What the function sends back for one turn. */
 export interface TurnResponse {
-  version: number;
-  /** The new messages, steps and notes, for the client to append. */
-  messages: ChatMessage[];
-  steps: TranscriptStep[];
-  notes: Note[];
-  state: TurnState;
+  /** The token to send with the next turn: of this run, or, after `done`, of the chat's next question. */
+  token: string;
   /** The queries to run before the next turn. When there are none, the client sends the next turn at once. */
   queries: string[];
   /** How much of each query's result to read. */

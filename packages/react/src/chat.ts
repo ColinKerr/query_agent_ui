@@ -1,4 +1,4 @@
-import { earlierQuestion, type AgentRun, type EarlierQuestion, type Note } from "@query-agent/client";
+import { earlierQuestion, type AgentRun, type EarlierQuestion } from "@query-agent/client";
 
 /** One question and what came of it. */
 export interface ChatTurn {
@@ -15,20 +15,21 @@ export interface ChatTurn {
   run?: AgentRun;
 }
 
-/** A chat: its questions in order. The earlier questions and the notes give a follow-up its context. */
+/** A chat: its questions in order. The earlier questions and the last run's token give a follow-up its context. */
 export interface Chat {
   turns: ChatTurn[];
 }
 
 /**
- * What a follow-up is told of the chat so far: each earlier question as the user saw it, with what
- * its run found, and the notes of the last finished run, which carry the whole chat's. Never the
- * earlier runs' messages or steps. A question that failed is left out.
+ * What a follow-up is sent of the chat so far: each earlier question as the user saw it, and the
+ * token of the last finished run, which carries what the agent keeps from the chat (sealed; the
+ * client never reads it). A question that failed is left out.
  */
-export async function contextOf(chat: Chat): Promise<{ earlier: EarlierQuestion[]; notes: Note[] }> {
+export async function contextOf(chat: Chat): Promise<{ earlier: EarlierQuestion[]; token?: string }> {
   const answered = chat.turns.filter((turn): turn is ChatTurn & { run: AgentRun } => turn.run !== undefined);
   const earlier = await Promise.all(answered.map((turn) => earlierQuestion(turn.question, turn.run)));
-  return { earlier, notes: answered.at(-1)?.run.notes ?? [] };
+  const token = answered.at(-1)?.run.token;
+  return { earlier, ...(token ? { token } : {}) };
 }
 
 /** The failure a user is shown. The reason is in the function's log, never in its reply. */

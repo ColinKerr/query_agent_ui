@@ -42,7 +42,7 @@ describe("earlierQuestion", () => {
   it("keeps the answer's rows only up to HISTORY_CAPS, and a cut cell's full length", async () => {
     const long = "x".repeat(300);
     const run = {
-      answer: "A.", query: "SELECT v FROM t", steps: [], notes: [], messages: [], systemPrompt: "", stoppedBecause: "answered" as const, usage: { requests: 1 },
+      answer: "A.", query: "SELECT v FROM t", stoppedBecause: "answered" as const, runId: "r", token: "t",
       answerRows: { columns: ["v"], rows: [[`${long.slice(0, 250)}`], ...Array.from({ length: 30 }, (_, i) => [i])], clipped: [[0, 0, 900]] as [number, number, number][] },
     };
     const earlier = await earlierQuestion("q", run);

@@ -1,7 +1,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { ReactElement } from "react";
-import { TURN_VERSION, type RawQueryResult, type TurnRequest, type TurnResponse } from "@query-agent/client";
+import type { RawQueryResult, TurnRequest, TurnResponse } from "@query-agent/client";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -43,15 +43,18 @@ export function rows(data: unknown[][]): RawQueryResult {
 
 export const CAPS = { maxRows: 200, maxChars: 12_000, maxCellChars: 400 };
 
-export function response(queries: string[], done?: { answer: string; query?: string; outcome?: string }, steps: TurnResponse["steps"] = []): TurnResponse {
+let sealed = 0;
+
+/** A response: the queries to run, or the end of the run with an answer. Each has a new opaque token. */
+export function response(queries: string[], done?: { answer: string; query?: string; outcome?: string }): TurnResponse {
+  sealed++;
   return {
-    version: TURN_VERSION, messages: [{ role: "assistant", content: done?.answer ?? "…" }], steps, notes: [],
-    state: { usage: { requests: 1 } } as TurnResponse["state"], queries, caps: CAPS,
+    token: `sealed-${sealed}`, queries, caps: CAPS,
     ...(done ? {
       done: {
-        answer: done.answer, query: done.query, stoppedBecause: "answered", systemPrompt: "p",
-        ...(done.outcome ? { structured: { explanation: done.answer, query: done.query ?? "", outcome: done.outcome, rowLimitIntended: false } } : {}),
-      } as TurnResponse["done"],
+        answer: done.answer, ...(done.query ? { query: done.query } : {}), stoppedBecause: "answered", runId: `run-${sealed}`,
+        ...(done.outcome ? { structured: { explanation: done.answer, query: done.query ?? "", outcome: done.outcome as "answered", rowLimitIntended: false } } : {}),
+      },
     } : {}),
   };
 }

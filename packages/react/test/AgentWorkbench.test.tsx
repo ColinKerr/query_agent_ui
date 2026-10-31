@@ -6,9 +6,7 @@ import { button, click, mount, response, rows, scriptedTurns, settle, type } fro
 
 describe("AgentWorkbench", () => {
   it("shows the answer's results and earlier chats, and nothing of how the agent worked", async () => {
-    const step = { tool: "runQuery", arguments: JSON.stringify({ ecsql: "SELECT COUNT(*) FROM e" }), result: "columns: [\"n\"]\n[3]", failed: false, ms: 1 };
-    const answered = response([], { answer: "There are 3.", query: "SELECT COUNT(*) FROM e" }, [step]);
-    answered.notes = [{ text: "A private note.", at: "t" }];
+    const answered = response([], { answer: "There are 3.", query: "SELECT COUNT(*) FROM e" });
     const turns = scriptedTurns([answered]);
     let reads = 0;
     const client = AgentClient.start({ turns, runQuery: async () => { reads++; return rows([[3]]); }, startupList: { lists: {}, queries: [] } });
@@ -19,7 +17,7 @@ describe("AgentWorkbench", () => {
     await settle(10);
     expect(button(container, "Steps")).toBeUndefined();
     expect(button(container, "Notes")).toBeUndefined();
-    expect(container.textContent).not.toContain("A private note.");
+    expect(container.textContent).not.toContain(answered.token);
     expect(container.querySelector(".qa-steps")).toBeNull();
 
     // The results were read once, when the run ended.
