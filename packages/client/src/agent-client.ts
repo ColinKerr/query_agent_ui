@@ -48,7 +48,7 @@ export interface AgentClientOptions {
   functionUrl?: string;
   /** In place of `functionUrl`: how to send one turn (a test, or the function in the same process). */
   turns?: TurnCall;
-  /** The access token for the function. Unused until the function needs authentication. */
+  /** The user's access key for the function, sent with every turn (`FetchTurnsOptions.getAccessToken`). */
   getAccessToken?: () => Promise<string | undefined>;
   /** The startup query list. The library's own list by default. */
   startupList?: StartupList;

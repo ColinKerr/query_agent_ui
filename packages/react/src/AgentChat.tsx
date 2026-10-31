@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import type { AgentClient, AgentRun, AgentStatus } from "@query-agent/client";
+import { TurnRefused, type AgentClient, type AgentRun, type AgentStatus } from "@query-agent/client";
 import { contextOf, FAILED, type Chat, type ChatTurn } from "./chat";
 import { Dots } from "./Dots";
 import { FeedbackForm, type Feedback } from "./Feedback";
@@ -22,6 +22,12 @@ export interface AgentChatProps {
   onAnswer?: (answer: { question: string; answer: string; query?: string; outcome?: string }) => void;
   /** Called with each finished run, whole. */
   onRunFinished?: (run: AgentRun, question: string) => void;
+  /**
+   * The function refused a question for a reason the user can act on (`TurnRefused`): 401 or 403
+   * ask for an access key, 429 means the key is used up. The control shows the function's sentence;
+   * a host can ask for a key here.
+   */
+  onRefused?: (refusal: TurnRefused) => void;
   /** Offered beside an answer's query: put it in the host's editor. */
   onUseQuery?: (ecsql: string) => void;
   /** When set, each answer has the feedback form, and what the user chooses to send goes here. */
@@ -49,7 +55,7 @@ export function statusLabel(status: AgentStatus | undefined): string {
 }
 
 export function AgentChat(props: AgentChatProps): JSX.Element {
-  const { client, editorText, onChange, onAnswer, onRunFinished, onUseQuery, onFeedback, renderAfterChat, onStatus } = props;
+  const { client, editorText, onChange, onAnswer, onRunFinished, onRefused, onUseQuery, onFeedback, renderAfterChat, onStatus } = props;
   const renderAfterAnswer = props.renderAfterAnswer
     ?? (onFeedback ? (turn: ChatTurn) => (turn.run ? <FeedbackForm turn={turn} onFeedback={onFeedback} /> : null) : undefined);
   const [chat, setChat] = useState<Chat>(props.initialChat ?? { turns: [] });
@@ -96,8 +102,14 @@ export function AgentChat(props: AgentChatProps): JSX.Element {
       turn = { question: text, answer: run.structured?.explanation ?? run.answer, query: run.structured?.query ?? run.query, outcome, run };
       onRunFinished?.(run, text);
       onAnswer?.({ question: text, answer: turn.answer, query: turn.query, outcome });
-    } catch {
-      turn = { question: text, answer: "", error: FAILED };
+    } catch (err) {
+      // A refusal the user can act on is shown as the function said it; anything else is a failure.
+      if (err instanceof TurnRefused) {
+        turn = { question: text, answer: "", error: err.message };
+        onRefused?.(err);
+      } else {
+        turn = { question: text, answer: "", error: FAILED };
+      }
     }
     update({ turns: [...before.turns, turn] });
     report(undefined);

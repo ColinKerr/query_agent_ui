@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import { act } from "react";
-import { AgentClient } from "@query-agent/client";
+import { AgentClient, TurnRefused } from "@query-agent/client";
 import { AgentChat } from "../src/AgentChat";
 import { FAILED } from "../src/chat";
 import { button, click, mount, response, rows, scriptedTurns, settle, type } from "./helpers";
@@ -62,6 +62,18 @@ describe("AgentChat", () => {
     expect(Object.keys(followUp).sort()).toEqual(["canQuery", "earlier", "question", "token"]);
     expect([...container.querySelectorAll(".qa-answer-text")].map((e) => e.textContent)).toEqual(["There are 3.", "Second."]);
     expect(container.textContent).not.toContain("sealed-");
+  });
+
+  it("shows the function's sentence when it refuses a question, and tells the host", async () => {
+    const refusal = new TurnRefused(429, "That access key has been used up.");
+    const client = AgentClient.start({ turns: async () => { throw refusal; } });
+    const onRefused = vi.fn();
+    const { container } = mount(<AgentChat client={client} onRefused={onRefused} />);
+    ask(container, "q");
+    await settle(10);
+    expect(container.textContent).toContain("That access key has been used up.");
+    expect(container.textContent).not.toContain(FAILED);
+    expect(onRefused).toHaveBeenCalledWith(refusal);
   });
 
   it("stops a run when asked, and shows what the agent had", async () => {

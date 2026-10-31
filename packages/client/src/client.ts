@@ -125,11 +125,26 @@ export async function driveTurns(question: string, client: ClientOptions, turn: 
   }
 }
 
+/** The refusals a user can act on: a chat to start again (400), a key to give or replace (401, 403), a key used up (429). */
+const REFUSALS = new Set([400, 401, 403, 429]);
+
+/**
+ * The function refused a turn for a reason the user can act on. `message` is the function's one
+ * sentence, meant to be shown as it is; `status` says which: 401 or 403 ask for an access key, 429
+ * means the key is used up, 400 means the chat must start again.
+ */
+export class TurnRefused extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message);
+    this.name = "TurnRefused";
+  }
+}
+
 export interface FetchTurnsOptions {
   /**
-   * The access token for the function, sent as `Authorization: Bearer <token>`. Unused until the
-   * function needs authentication (step 5 of the split plan); an input now so a host's code does
-   * not change then.
+   * The user's credential for the function, sent with every turn as `Authorization: Bearer <it>`:
+   * the access key the owner gave them. A function that checks access refuses a turn without one
+   * (`TurnRefused`, 401).
    */
   getAccessToken?: () => Promise<string | undefined>;
 }
@@ -149,8 +164,11 @@ export function fetchTurns(url: string, options: FetchTurnsOptions = {}): TurnCa
       signal,
     });
     const body = await response.json() as TurnResponse | { error?: string };
+    const reason = (body as { error?: string }).error;
+    if (!response.ok && REFUSALS.has(response.status) && reason)
+      throw new TurnRefused(response.status, reason);
     if (!response.ok)
-      throw new Error(`The agent function refused the turn (HTTP ${response.status}): ${(body as { error?: string }).error ?? "no reason given"}`);
+      throw new Error(`The agent function refused the turn (HTTP ${response.status}): ${reason ?? "no reason given"}`);
     return body as TurnResponse;
   };
   return async (request, signal) => {

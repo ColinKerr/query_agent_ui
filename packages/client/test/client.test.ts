@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import * as http from "node:http";
-import { driveTurns, fetchTurns, runStartupQueries, type StartupList } from "../src/client";
+import { driveTurns, fetchTurns, runStartupQueries, TurnRefused, type StartupList } from "../src/client";
 import type { TurnRequest } from "../src/turn-api";
 import { CAPS, fakeQueries, response, scriptedTurns } from "./helpers";
 
@@ -59,6 +59,19 @@ describe("fetchTurns", () => {
     const url = await serve(() => [502, { error: "The turn failed. The function's log has the reason." }]);
     await expect(fetchTurns(url)({ question: "q", canQuery: false }))
       .rejects.toThrow(/HTTP 502.*function's log/);
+  });
+
+  it("gives a refusal the user can act on as TurnRefused, with the function's sentence", async () => {
+    for (const status of [400, 401, 403, 429]) {
+      const url = await serve(() => [status, { error: `sentence ${status}` }]);
+      const refused = await fetchTurns(url)({ question: "q", canQuery: false }).catch((err: unknown) => err);
+      expect(refused).toBeInstanceOf(TurnRefused);
+      expect(refused).toMatchObject({ status, message: `sentence ${status}` });
+      await new Promise<void>((resolve) => server!.close(() => resolve()));
+      server = undefined;
+    }
+    const url = await serve(() => [502, { error: "The turn failed." }]);
+    expect(await fetchTurns(url)({ question: "q", canQuery: false }).catch((err: unknown) => err)).not.toBeInstanceOf(TurnRefused);
   });
 });
 
