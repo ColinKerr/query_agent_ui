@@ -1,6 +1,6 @@
 {
   "name": "@colin_kerr/query-agent-client",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "The query agent's client library: runs the agent's queries on the host's iModel, and drives the turns with the agent function.",
   "keywords": [
     "itwin",
@@ -10,7 +10,7 @@
     "ai",
     "agent",
     "query"
-  ],``
+  ],
   "license": "MIT",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",

@@ -1,6 +1,6 @@
 {
   "name": "@colin_kerr/query-agent-react",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "The query agent's React controls: the chat (AgentChat), the larger control (AgentWorkbench), and the feedback form.",
   "keywords": [
     "itwin",
@@ -30,7 +30,7 @@
     "build": "tsc -p tsconfig.json && cp src/styles.css dist/styles.css"
   },
   "dependencies": {
-    "@colin_kerr/query-agent-client": "0.1.1"
+    "@colin_kerr/query-agent-client": "0.1.2"
   },
   "peerDependencies": {
     "react": "^18.3.1",

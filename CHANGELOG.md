@@ -5,3 +5,8 @@
 First public release: the client library (`@colin_kerr/query-agent-client`) and the React controls
 (`@colin_kerr/query-agent-react`), including answer modes, paged results, and selecting an
 answer's elements.
+
+
+## 0.1.2
+
+Fix version references between packages
