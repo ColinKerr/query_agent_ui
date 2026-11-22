@@ -1,6 +1,6 @@
 {
   "name": "@colin_kerr/query-agent-client",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The query agent's client library: runs the agent's queries on the host's iModel, and drives the turns with the agent function.",
   "keywords": [
     "itwin",

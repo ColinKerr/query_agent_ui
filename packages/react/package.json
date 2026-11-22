@@ -1,6 +1,6 @@
 {
   "name": "@colin_kerr/query-agent-react",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The query agent's React controls: the chat (AgentChat), the larger control (AgentWorkbench), and the feedback form.",
   "keywords": [
     "itwin",
