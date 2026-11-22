@@ -13,7 +13,7 @@
   },
   "devDependencies": {
     "@itwin/appui-abstract": "^5.14.2",
-    "@itwin/core-bentley": "^5.14.2",
+    "@itwin/core-bentley": "^5.15.1",
     "@itwin/core-common": "^5.14.2",
     "@itwin/core-frontend": "^5.14.2",
     "@itwin/core-geometry": "^5.14.2",
