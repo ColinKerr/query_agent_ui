@@ -9,7 +9,13 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces",
-    "test": "vitest run"
+    "dev": "node scripts/dev.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json",
+    "clean": "node -e \"for (const d of [\\\"client\\\",\\\"react\\\"]) require(\\\"fs\\\").rmSync(\\\"packages/\\\"+d+\\\"/dist\\\",{recursive:true,force:true})\"",
+    "pack:local": "npm run clean && npm run build && npm pack -w packages/client -w packages/react --pack-destination tarballs",
+    "version:set": "node scripts/set-version.mjs"
   },
   "devDependencies": {
     "@itwin/appui-abstract": "^5.14.2",

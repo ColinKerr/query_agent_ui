@@ -78,6 +78,20 @@ const client = AgentClient.start({ runQuery: queryRunner(imodel), imodelName: im
 While a run is in progress the chat shows "Exploring", "Thinking" or "Running a query", with
 moving dots. Nothing is uploaded by the controls: feedback goes to the host's `onFeedback`.
 
-## Build and test
+## Develop
 
-`npm install`, `npm run build`, `npm test`.
+`npm install` once, then:
+
+| Command | Does |
+|---|---|
+| `npm test` / `npm run test:watch` | Runs the tests of both packages. Each package reads the other's source, so no build is needed first. |
+| `npm run typecheck` | Checks both packages' source and tests as one program. The editor uses the same `tsconfig.json`. |
+| `npm run dev` | Rebuilds both packages' `dist/` whenever their source changes. Leave it running while you work on an app that uses them. |
+| `npm run build` | Builds both packages, the client first. |
+| `npm run clean` | Removes both `dist/` folders. |
+| `npm run version:set -- 0.1.3` | Gives both packages that version, points the React package's dependency on the client at it, and refreshes `package-lock.json`. Then add a `CHANGELOG.md` entry. |
+| `npm run pack:local` | Cleans, builds and packs both packages into `tarballs/`, for installing in an app with `file:`. |
+
+To try a change in an app, run `npm run dev` here and `npm link @colin_kerr/query-agent-client
+@colin_kerr/query-agent-react` in the app. The app must load one copy of React (in Vite,
+`resolve.dedupe: ["react", "react-dom"]`).

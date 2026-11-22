@@ -14,7 +14,7 @@ describe("the feedback form", () => {
 
   it("shows exactly what will be sent, and sends only that when the user chooses", async () => {
     const onFeedback = vi.fn();
-    const { container } = mount(<FeedbackForm turn={{ ...turn, run: { systemPrompt: "SECRET PROMPT" } as ChatTurn["run"] }} onFeedback={onFeedback} />);
+    const { container } = mount(<FeedbackForm turn={{ ...turn, run: { systemPrompt: "SECRET PROMPT" } as unknown as ChatTurn["run"] }} onFeedback={onFeedback} />);
     click(button(container, "Wrong"));
     const [answer, query, comment] = [...container.querySelectorAll("textarea")];
     type(answer, "There are 4.");

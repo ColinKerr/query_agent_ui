@@ -30,7 +30,7 @@
     "build": "tsc -p tsconfig.json && cp src/styles.css dist/styles.css"
   },
   "dependencies": {
-    "@colin_kerr/query-agent-client": "0.1.0"
+    "@colin_kerr/query-agent-client": "0.1.1"
   },
   "peerDependencies": {
     "react": "^18.3.1",

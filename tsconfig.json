@@ -1,0 +1,21 @@
+{
+  "//": "For the editor and `npm run typecheck`: both packages' source and tests, one program, the packages reading each other's source. The published builds use each package's own tsconfig.",
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "declaration": false,
+    "sourceMap": false,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@colin_kerr/query-agent-client": ["packages/client/src/index.ts"],
+      "@colin_kerr/query-agent-client/node": ["packages/client/src/node/index.ts"],
+      "@colin_kerr/query-agent-react": ["packages/react/src/index.ts"]
+    }
+  },
+  "include": ["packages/*/src/**/*", "packages/*/test/**/*", "vitest.config.mts"]
+}
