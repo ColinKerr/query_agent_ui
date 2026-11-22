@@ -1,9 +1,6 @@
 name: Release
 
-# Publishes both packages to npm when a version tag is pushed (git tag v0.1.1 && git push origin v0.1.1).
-# It uses npm trusted publishing: GitHub proves the workflow's identity to npm, so no npm token is
-# stored here. Each package needs a trusted publisher set on npmjs.com for this repository,
-# the workflow file "release.yml" and the environment "npm-publish".
+# Stages both packages on npm when a version tag is pushed (git tag v0.1.1 && git push origin v0.1.1).
 
 on:
   push:
@@ -46,17 +43,24 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: npm
 
-      - name: Trusted publishing needs npm 11.5.1 or later
+      # `npm stage publish` needs npm 11.15.0 or later. Node 24 may ship an older npm.
+      - name: Make sure npm is 11.15.0 or later
         run: |
+          set -euo pipefail
+          old() { node -e 'const [a,b]=process.argv[1].split(".").map(Number); process.exit(a>11||(a===11&&b>=15)?1:0)' "$(npm --version)"; }
+          if old; then npm install -g npm@^11.15.0; fi
           npm --version
-          node -e 'const [a,b,c]=process.argv[1].split(".").map(Number); if (a<11||(a===11&&(b<5||(b===5&&c<1)))) { console.error("npm is too old"); process.exit(1); }' "$(npm --version)"
+          old && { echo "::error::npm is still older than 11.15.0."; exit 1; } || true
 
       - run: npm ci
       - run: npm run build
       - run: npm test
 
-      # The client first: the React package depends on it.
-      - name: Publish the client
-        run: npm publish -w packages/client --access public --provenance
-      - name: Publish the React controls
-        run: npm publish -w packages/react --access public --provenance
+      # The client first: the React package depends on it. Run from each package's directory:
+      # npm's docs say `npm stage` is unaware of workspaces. A staged version is not public.
+      - name: Stage the client
+        working-directory: packages/client
+        run: npm stage publish --access public --provenance
+      - name: Stage the React controls
+        working-directory: packages/react
+        run: npm stage publish --access public --provenance
