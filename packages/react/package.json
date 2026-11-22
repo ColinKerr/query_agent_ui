@@ -1,9 +1,8 @@
 {
-  "name": "@query-agent/react",
+  "name": "@colin_kerr/query-agent-react",
   "version": "0.1.0",
   "description": "The query agent's React controls: the chat (AgentChat), the larger control (AgentWorkbench), and the feedback form.",
   "license": "MIT",
-  "private": true,
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -15,6 +14,6 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && cp src/styles.css dist/styles.css"
   },
-  "dependencies": { "@query-agent/client": "0.1.0" },
+  "dependencies": { "@colin_kerr/query-agent-client": "0.1.0" },
   "peerDependencies": { "react": "^18.3.1", "react-dom": "^18.3.1" }
 }

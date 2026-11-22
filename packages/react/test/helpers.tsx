@@ -1,7 +1,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { ReactElement } from "react";
-import type { RawQueryResult, TurnRequest, TurnResponse } from "@query-agent/client";
+import type { RawQueryResult, TurnRequest, TurnResponse } from "@colin_kerr/query-agent-client";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

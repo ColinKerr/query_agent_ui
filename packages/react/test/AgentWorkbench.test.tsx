@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { AgentClient } from "@query-agent/client";
+import { AgentClient } from "@colin_kerr/query-agent-client";
 import { AgentWorkbench } from "../src/AgentWorkbench";
 import { button, click, mount, response, rows, scriptedTurns, settle, type } from "./helpers";
 

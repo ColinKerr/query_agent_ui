@@ -15,7 +15,7 @@ between them is `docs/turn-api.md` in `query_agent_function`.
 ### Use the client
 
 ```ts
-import { AgentClient, queryRunner } from "@query-agent/client";
+import { AgentClient, queryRunner } from "@colin_kerr/query-agent-client";
 
 // Start it when the iModel opens: it runs the startup query list at once.
 const client = AgentClient.start({ runQuery: queryRunner(imodel), imodelName: imodel.name, functionUrl });
@@ -28,11 +28,11 @@ console.log(run.answer, run.query);
 
 ### In Node
 
-For tests and scripts, `@query-agent/client/node` starts iTwin.js's frontend in Node, so the
+For tests and scripts, `@colin_kerr/query-agent-client/node` starts iTwin.js's frontend in Node, so the
 queries go to a backend by RPC, as a browser's do. It needs `global-jsdom` and `jsdom`.
 
 ```ts
-import { connectionFromProps, startNodeFrontend } from "@query-agent/client/node";
+import { connectionFromProps, startNodeFrontend } from "@colin_kerr/query-agent-client/node";
 
 await startNodeFrontend(backendUrl);
 const imodel = connectionFromProps(connectionPropsFromTheBackend);
@@ -41,8 +41,8 @@ const imodel = connectionFromProps(connectionPropsFromTheBackend);
 ### The controls
 
 ```tsx
-import { AgentWorkbench } from "@query-agent/react";
-import "@query-agent/react/styles.css";
+import { AgentWorkbench } from "@colin_kerr/query-agent-react";
+import "@colin_kerr/query-agent-react/styles.css";
 
 <AgentWorkbench
   client={client}                       // a started AgentClient, or undefined: "not set up"

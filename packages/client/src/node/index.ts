@@ -5,7 +5,7 @@
  * iTwin.js's frontend needs a DOM to start, so a DOM shim (`global-jsdom`) is loaded first, as
  * iTwin.js's own Node frontend tests do. Without it `NoRenderApp.startup` fails with "window is
  * not defined", and a bare `window` object is not enough for the RPC requests (researched and
- * tested 2026-10-28; `Query_Agent_Split_PartC.md` in imodulator_cli).
+ * tested 2026-10-28).
  *
  * ```ts
  * await startNodeFrontend(backendUrl);

@@ -1,4 +1,4 @@
-import { earlierQuestion, type AgentRun, type EarlierQuestion } from "@query-agent/client";
+import { earlierQuestion, type AgentRun, type EarlierQuestion } from "@colin_kerr/query-agent-client";
 
 /** One question and what came of it. */
 export interface ChatTurn {

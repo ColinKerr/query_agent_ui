@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import { act } from "react";
-import { AgentClient, TurnRefused } from "@query-agent/client";
+import { AgentClient, TurnRefused } from "@colin_kerr/query-agent-client";
 import { AgentChat } from "../src/AgentChat";
 import { FAILED } from "../src/chat";
 import { button, click, mount, response, rows, scriptedTurns, settle, type } from "./helpers";
@@ -12,6 +12,12 @@ function ask(container: HTMLElement, question: string): void {
 }
 
 describe("AgentChat", () => {
+  it("says why there is no client, and keeps the ask box closed", () => {
+    const { container } = mount(<AgentChat unavailable="Enter your access key to ask the agent." />);
+    expect(container.querySelector(".qa-notice")?.textContent).toBe("Enter your access key to ask the agent.");
+    expect(container.querySelector("textarea")?.disabled).toBe(true);
+  });
+
   it("shows the phase with moving dots while it works, then the answer and its query", async () => {
     let release: () => void = () => {};
     const gate = () => new Promise<void>((resolve) => { release = resolve; });
@@ -65,13 +71,13 @@ describe("AgentChat", () => {
   });
 
   it("shows the function's sentence when it refuses a question, and tells the host", async () => {
-    const refusal = new TurnRefused(429, "That access key has been used up.");
+    const refusal = new TurnRefused(429, "That access key has used up its limit, so the agent stopped answering.");
     const client = AgentClient.start({ turns: async () => { throw refusal; } });
     const onRefused = vi.fn();
     const { container } = mount(<AgentChat client={client} onRefused={onRefused} />);
     ask(container, "q");
     await settle(10);
-    expect(container.textContent).toContain("That access key has been used up.");
+    expect(container.textContent).toContain("That access key has used up its limit, so the agent stopped answering.");
     expect(container.textContent).not.toContain(FAILED);
     expect(onRefused).toHaveBeenCalledWith(refusal);
   });
@@ -110,14 +116,14 @@ describe("AgentChat", () => {
 
 describe("AgentChat, driven by the host", () => {
   it("asks a question the host gives, once for each key, and draws the host's buttons under the answer", async () => {
-    const turns = scriptedTurns([response([], { answer: "From the case." })]);
+    const turns = scriptedTurns([response([], { answer: "From the host." })]);
     const client = AgentClient.start({ turns });
-    const { container, root } = mount(<AgentChat client={client} question={{ text: "the case's question", key: 1 }} answerActions={() => <button type="button">New case</button>} />);
+    const { container, root } = mount(<AgentChat client={client} question={{ text: "the host's question", key: 1 }} answerActions={() => <button type="button">Save</button>} />);
     await settle();
-    expect(turns.requests[0].question).toBe("the case's question");
-    expect(container.querySelector(".qa-answer-text")?.textContent).toBe("From the case.");
-    expect(button(container, "New case")).toBeDefined();
-    act(() => root.render(<AgentChat client={client} question={{ text: "the case's question", key: 1 }} />));
+    expect(turns.requests[0].question).toBe("the host's question");
+    expect(container.querySelector(".qa-answer-text")?.textContent).toBe("From the host.");
+    expect(button(container, "Save")).toBeDefined();
+    act(() => root.render(<AgentChat client={client} question={{ text: "the host's question", key: 1 }} />));
     await settle();
     expect(turns.requests).toHaveLength(1);
   });

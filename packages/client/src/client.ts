@@ -8,8 +8,9 @@
  */
 
 import { readCapped, type RunRawQuery } from "./caps";
+import type { ResultPages } from "./result-pages";
 import {
-  HISTORY_CAPS, type EarlierQuestion, type QueryRows, type ResultCaps, type StartupResult, type StopReason, type SubmittedAnswer,
+  HISTORY_CAPS, type AnswerMode, type ResultType, type EarlierQuestion, type QueryRows, type ResultCaps, type StartupResult, type StopReason, type SubmittedAnswer,
   type TurnRequest, type TurnResponse,
 } from "./turn-api";
 
@@ -24,6 +25,8 @@ export interface ClientOptions {
   earlier?: readonly EarlierQuestion[];
   /** The token of the chat's last finished run. Opaque: kept and sent back, never read. */
   token?: string;
+  /** How the answer is to be given (`AnswerMode`). Sent with every turn. */
+  answerMode?: AnswerMode;
   /** Called before each turn is sent (`thinking`), and before each query runs (`querying`, with its ECSql). */
   onPhase?: (phase: "thinking" | "querying", ecsql?: string) => void;
   signal?: AbortSignal;
@@ -42,8 +45,21 @@ export interface AgentRun {
   runId: string;
   /** The token for the chat's next question. Opaque: the agent's own state, sealed. */
   token: string;
+  /** The answer mode the run was asked in, as the host sent it. */
+  answerMode?: AnswerMode;
+  /**
+   * In the `auto` and `select` modes: what the answer is (`done.resultType`). `selection`: its
+   * query is the selection, and no rows clears it. `answer`: select its rows only when they carry
+   * `ECInstanceId` and `ClassName`.
+   */
+  resultType?: ResultType;
   /** The answer's query's rows, read once when the run ended (`AgentClient.ask`), or its error. */
   answerRows?: AnswerRows;
+  /**
+   * All the answer's rows, with no limit, read a page at a time as a table asks for them. Present
+   * when the answer has a query and there is an iModel. For the host only: never sent to the function.
+   */
+  results?: ResultPages;
 }
 
 /** An answer's query's rows, as the client read them, or the error it gave. */
@@ -83,7 +99,7 @@ async function historyRows(read: AnswerRows): Promise<AnswerRows> {
   return { columns: cut.columns, rows: cut.rows, ...(clipped.length > 0 ? { clipped } : {}), ...(truncatedBy ? { truncatedBy } : {}) };
 }
 
-/** One call to the function: over HTTP (`fetchTurns`), or in the same process, for tests and training. */
+/** One call to the function: over HTTP (`fetchTurns`), or in the same process, for tests. */
 export type TurnCall = (request: TurnRequest, signal?: AbortSignal) => Promise<TurnResponse>;
 
 /**
@@ -102,6 +118,7 @@ export async function driveTurns(question: string, client: ClientOptions, turn: 
       ...(token ? { token } : {}),
       ...(results ? { results } : {}),
       ...(client.signal?.aborted ? { aborted: true } : {}),
+      ...(client.answerMode ? { answerMode: client.answerMode } : {}),
     };
     client.onPhase?.("thinking");
     const response: TurnResponse = await turn(request, client.signal);
@@ -115,6 +132,7 @@ export async function driveTurns(question: string, client: ClientOptions, turn: 
         ...(done.structured ? { structured: done.structured } : {}),
         runId: done.runId,
         token: response.token,
+        ...(done.resultType ? { resultType: done.resultType } : {}),
       };
     }
     results = [];
@@ -125,13 +143,14 @@ export async function driveTurns(question: string, client: ClientOptions, turn: 
   }
 }
 
-/** The refusals a user can act on: a chat to start again (400), a key to give or replace (401, 403), a key used up (429). */
-const REFUSALS = new Set([400, 401, 403, 429]);
+/** The refusals a user can act on: a chat to start again (400), a key to give or replace (401, 403), too long a request (413), a key used up (429). */
+const REFUSALS = new Set([400, 401, 403, 413, 429]);
 
 /**
  * The function refused a turn for a reason the user can act on. `message` is the function's one
  * sentence, meant to be shown as it is; `status` says which: 401 or 403 ask for an access key, 429
- * means the key is used up, 400 means the chat must start again.
+ * means the key is used up, which can happen in the middle of a question, 413 means the request is
+ * too long, 400 means the chat must start again.
  */
 export class TurnRefused extends Error {
   constructor(public readonly status: number, message: string) {
@@ -245,7 +264,7 @@ export function expandLists(ecsql: string, lists: Record<string, string[]>): str
     const name = kind === "in" ? rest : rest.slice(at + 1);
     const values = lists[name];
     if (!values || values.length === 0)
-      throw new Error(`imodel-context: no list named "${name}"`);
+      throw new Error(`startup list: no list named "${name}"`);
     if (kind === "in")
       return values.map(quote).join(", ");
     const expression = rest.slice(0, at);

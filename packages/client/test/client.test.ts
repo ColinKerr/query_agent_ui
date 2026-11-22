@@ -28,6 +28,21 @@ describe("driveTurns", () => {
   });
 });
 
+describe("a refusal in the middle of a run", () => {
+  it("ends the question with the function's sentence, once its queries have run", async () => {
+    const phases: string[] = [];
+    let turn = 0;
+    const turns = async () => {
+      if (turn++ === 0)
+        return response(["SELECT 1"]);
+      throw new TurnRefused(429, "That access key has used up its limit, so the agent stopped answering.");
+    };
+    await expect(driveTurns("q", { runQuery: fakeQueries({ "SELECT 1": [[1]] }), onPhase: (phase) => phases.push(phase) }, turns))
+      .rejects.toMatchObject({ status: 429, message: expect.stringContaining("used up its limit") });
+    expect(phases).toEqual(["thinking", "querying", "thinking"]);
+  });
+});
+
 describe("fetchTurns", () => {
   async function serve(handler: (request: TurnRequest, headers: http.IncomingHttpHeaders) => [number, unknown]): Promise<string> {
     server = http.createServer((req, res) => {
@@ -62,7 +77,7 @@ describe("fetchTurns", () => {
   });
 
   it("gives a refusal the user can act on as TurnRefused, with the function's sentence", async () => {
-    for (const status of [400, 401, 403, 429]) {
+    for (const status of [400, 401, 403, 413, 429]) {
       const url = await serve(() => [status, { error: `sentence ${status}` }]);
       const refused = await fetchTurns(url)({ question: "q", canQuery: false }).catch((err: unknown) => err);
       expect(refused).toBeInstanceOf(TurnRefused);

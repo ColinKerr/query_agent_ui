@@ -1,10 +1,10 @@
 /**
  * The turn API's types: everything that travels between the client and the function, and nothing
  * else. The agent's own state (its conversation with the model, its steps, notes and counters)
- * travels only inside the sealed token, which the client cannot read (`run-state.ts`).
+ * travels only inside the sealed token, which the client cannot read.
  *
- * The REST API document is `docs/turn-api.md` in query_agent_function. This module imports nothing,
- * so the public UI repository carries a copy of it as it is. Change both together.
+ * This module imports nothing, so the client library and the agent function each carry the same
+ * copy of it. Change both together.
  */
 
 export interface ResultCaps {
@@ -88,6 +88,32 @@ export interface SubmittedAnswer {
   via?: "labels";
 }
 
+/**
+ * How the answer is to be given, for a host with unified selection. Absent, or any other value, is
+ * the plain answer.
+ *
+ * - `auto`: the host selects elements from answers. The agent decides, question by question,
+ *   whether the question asks to select elements. An answer whose rows are elements also returns
+ *   their `ECInstanceId` and `ClassName`.
+ * - `select`: a host preference (the user set the app to select): every question is a request to
+ *   select elements, and the answer's `query` is the selection. A host sets it from the user's
+ *   choice, never from scanning the question.
+ */
+export type AnswerMode = "auto" | "select";
+
+/** The answer modes, for checking a request's. */
+export const ANSWER_MODES: readonly AnswerMode[] = ["auto", "select"];
+
+/**
+ * What a finished answer is, in the `auto` and `select` modes (`TurnDone.resultType`). It tells
+ * the host what to do with the answer, not how the agent made it.
+ *
+ * - `selection`: the answer's `query` is the selection. Select its rows (`ECInstanceId`,
+ *   `ClassName`); no rows, or `not_found`, clears the selection.
+ * - `answer`: an answer to show. Select its rows only when they have both key columns.
+ */
+export type ResultType = "selection" | "answer";
+
 /** What the client sends for one turn: `POST /turn`. */
 export interface TurnRequest {
   question: string;
@@ -108,6 +134,8 @@ export interface TurnRequest {
   results?: QueryRows[];
   /** The user stopped the run: the function handles the last reply's calls and ends it, with no LLM call. */
   aborted?: boolean;
+  /** How the answer is to be given (`AnswerMode`). Sent with every turn of a run, the same each time. */
+  answerMode?: AnswerMode;
 }
 
 /** What the run ends with: the answer, as the user sees it. */
@@ -119,8 +147,10 @@ export interface TurnDone {
   /** The answer as submitted with `submitAnswer`, when the run ended that way. */
   structured?: SubmittedAnswer;
   stoppedBecause: StopReason;
-  /** Names the run's record, where the function keeps one (a developer's run folder). */
+  /** Names the run's record, where the function keeps one. */
   runId: string;
+  /** In the `auto` and `select` modes: what the answer is (`ResultType`). */
+  resultType?: ResultType;
 }
 
 /** What the function sends back for one turn. */

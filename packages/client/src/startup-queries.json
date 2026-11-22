@@ -1,6 +1,6 @@
 {
   "description": [
-    "The queries the client library runs on an iModel before the first question: the startup query list. It sends their rows with every turn, and the function writes them into the agent's instructions with the rules in prompt/imodel-context.json, matched by rule and id (plan/Query_Agent_Split_PartA.md, step A3).",
+    "The queries the client library runs on an iModel before the first question: the startup query list. It sends their rows with every turn, and the function writes them into the agent's instructions, matched by rule and id.",
     "ecsql: any ECSql. {{in:list}} expands a list from `lists` to 'a', 'b'. {{like:expr:list}} expands to (expr LIKE '%a%' OR ...), and {{notlike:expr:list}} to (expr NOT LIKE '%a%' AND ...); a value that already contains % is used as written.",
     "max: rows sent (default 20); the rest are counted, up to 500. A query that fails sends no rows and its error.",
     "onlyIfEmpty: run only when the named queries of the same rule were empty (no rows, or a single 0). each: a second query run for every row sent, with the row's columns as {0}, {1}; its first value is sent with the row. Every `each` query runs to the end: there is no time limit, because the first context matters more than the seconds it takes.",
