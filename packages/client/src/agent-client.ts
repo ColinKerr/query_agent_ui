@@ -8,12 +8,12 @@
  * ```
  */
 
-import { readCapped, type RunRawQuery } from "./caps";
-import { driveTurns, fetchTurns, runStartupQueries, type AgentRun, type AnswerRows, type ClientOptions, type StartupList, type TurnCall } from "./client";
-import { instanceKeys, readSelection, type InstanceKey, type RunSelection } from "./selection";
-import { ResultPages } from "./result-pages";
+import { readCapped, type RunRawQuery } from "./caps.js";
+import { driveTurns, fetchTurns, runStartupQueries, type AgentRun, type AnswerRows, type ClientOptions, type StartupList, type TurnCall } from "./client.js";
+import { instanceKeys, readSelection, type InstanceKey, type RunSelection } from "./selection.js";
+import { ResultPages } from "./result-pages.js";
 import defaultList from "./startup-queries.json";
-import type { AnswerMode, EarlierQuestion, QueryRows, ResultCaps, StartupResult } from "./turn-api";
+import type { AnswerMode, EarlierQuestion, QueryRows, ResultCaps, StartupResult } from "./turn-api.js";
 
 /** The library's startup query list (`startup-queries.json`): what a client runs when it starts. */
 export const DEFAULT_STARTUP_LIST = defaultList as StartupList;

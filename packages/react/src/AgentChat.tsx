@@ -5,11 +5,11 @@
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { TurnRefused, type AgentClient, type AgentRun, type AgentStatus } from "@colin_kerr/query-agent-client";
-import { contextOf, FAILED, type Chat, type ChatTurn } from "./chat";
-import { Dots } from "./Dots";
-import { FeedbackForm, type Feedback } from "./Feedback";
-import { SelectElements, type AnswerSelection } from "./SelectElements";
-import { selectableOf, selectAnswerElements, selectsNothing } from "./selection";
+import { contextOf, FAILED, type Chat, type ChatTurn } from "./chat.js";
+import { Dots } from "./Dots.js";
+import { FeedbackForm, type Feedback } from "./Feedback.js";
+import { SelectElements, type AnswerSelection } from "./SelectElements.js";
+import { selectableOf, selectAnswerElements, selectsNothing } from "./selection.js";
 
 export interface AgentChatProps {
   /** The started client, or undefined when the agent is not set up. */

@@ -7,7 +7,7 @@
  * the rest. The rows stay with the host. They are never sent to the function.
  */
 
-import type { RunRawQuery } from "./caps";
+import type { RunRawQuery } from "./caps.js";
 
 /** An element as the unified selection names it: its class (`Schema.Class`) and its id (`0x..`). */
 export interface InstanceKey {

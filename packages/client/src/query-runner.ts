@@ -4,7 +4,7 @@
  * Node. They are typed here by what is used, so this package depends on neither.
  */
 
-import type { QueryPageOptions, RunRawQuery } from "./caps";
+import type { QueryPageOptions, RunRawQuery } from "./caps.js";
 
 /** The part of iTwin.js's `ECSqlReader` that the runner uses. */
 export interface QueryReader {

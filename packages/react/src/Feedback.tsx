@@ -6,7 +6,7 @@
  */
 
 import { useState } from "react";
-import type { ChatTurn } from "./chat";
+import type { ChatTurn } from "./chat.js";
 
 export type Rating = "right" | "partly" | "wrong";
 

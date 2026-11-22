@@ -5,7 +5,7 @@
 
 import { useState } from "react";
 import type { AgentClient, AgentRun } from "@colin_kerr/query-agent-client";
-import { plural, selectableOf, selectAnswerElements, selectedMessage, type SelectedElements, type SelectionTarget } from "./selection";
+import { plural, selectableOf, selectAnswerElements, selectedMessage, type SelectedElements, type SelectionTarget } from "./selection.js";
 
 /** The host's unified selection, as the controls are given it (`AgentChatProps.selection`). */
 export interface AnswerSelection {

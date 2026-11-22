@@ -7,12 +7,12 @@
  * startup list's rows go with every turn, and the function writes them into the instructions.
  */
 
-import { readCapped, type RunRawQuery } from "./caps";
-import type { ResultPages } from "./result-pages";
+import { readCapped, type RunRawQuery } from "./caps.js";
+import type { ResultPages } from "./result-pages.js";
 import {
   HISTORY_CAPS, type AnswerMode, type ResultType, type EarlierQuestion, type QueryRows, type ResultCaps, type StartupResult, type StopReason, type SubmittedAnswer,
   type TurnRequest, type TurnResponse,
-} from "./turn-api";
+} from "./turn-api.js";
 
 /** What the client supplies to a run, wherever the function runs. */
 export interface ClientOptions {

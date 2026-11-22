@@ -11,7 +11,7 @@
  * up every page it passed. Read pages are kept, so scrolling back costs nothing.
  */
 
-import type { RawQueryResult, RunRawQuery } from "./caps";
+import type { RawQueryResult, RunRawQuery } from "./caps.js";
 
 /** How many rows one page reads. */
 export const RESULT_PAGE_ROWS = 1000;

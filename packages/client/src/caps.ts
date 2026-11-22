@@ -5,7 +5,7 @@
  * so the rules here are the turn API's, and the function is tested against them.
  */
 
-import type { QueryRows, ResultCaps } from "./turn-api";
+import type { QueryRows, ResultCaps } from "./turn-api.js";
 
 /**
  * One query's results, streamed, so the reader can stop once a cap is reached: nothing should

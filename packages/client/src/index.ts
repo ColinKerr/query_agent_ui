@@ -3,11 +3,11 @@
  * turns with the agent function (`docs/design.md`).
  */
 
-export * from "./turn-api";
-export * from "./caps";
-export * from "./client";
-export * from "./query-runner";
-export * from "./agent-client";
-export * from "./selection";
-export * from "./result-pages";
+export * from "./turn-api.js";
+export * from "./caps.js";
+export * from "./client.js";
+export * from "./query-runner.js";
+export * from "./agent-client.js";
+export * from "./selection.js";
+export * from "./result-pages.js";
 

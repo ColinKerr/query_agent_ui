@@ -2,6 +2,15 @@
   "name": "@colin_kerr/query-agent-client",
   "version": "0.1.0",
   "description": "The query agent's client library: runs the agent's queries on the host's iModel, and drives the turns with the agent function.",
+  "keywords": [
+    "itwin",
+    "itwinjs",
+    "imodel",
+    "ecsql",
+    "ai",
+    "agent",
+    "query"
+  ],
   "license": "MIT",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
@@ -43,5 +52,18 @@
     "jsdom": {
       "optional": true
     }
+  },
+  "author": "Colin Kerr",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ColinKerr/query_agent_ui.git",
+    "directory": "packages/client"
+  },
+  "homepage": "https://github.com/ColinKerr/query_agent_ui#readme",
+  "bugs": {
+    "url": "https://github.com/ColinKerr/query_agent_ui/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

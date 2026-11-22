@@ -8,9 +8,9 @@
 
 import { useState } from "react";
 import type { AnswerRows, ResultPages } from "@colin_kerr/query-agent-client";
-import { ResultsTable } from "./ResultsTable";
-import { AgentChat, type AgentChatProps } from "./AgentChat";
-import type { Chat } from "./chat";
+import { ResultsTable } from "./ResultsTable.js";
+import { AgentChat, type AgentChatProps } from "./AgentChat.js";
+import type { Chat } from "./chat.js";
 
 export type AgentWorkbenchProps = Omit<AgentChatProps, "renderAfterAnswer" | "renderAfterChat" | "initialChat"> & {
   /**

@@ -3,11 +3,11 @@
  * `AgentWorkbench` embeds it and shows what the agent did beside it. Import `styles.css` once.
  */
 
-export * from "./AgentChat";
-export * from "./AgentWorkbench";
-export * from "./Feedback";
-export * from "./chat";
-export * from "./Dots";
-export * from "./selection";
-export * from "./SelectElements";
-export * from "./ResultsTable";
+export * from "./AgentChat.js";
+export * from "./AgentWorkbench.js";
+export * from "./Feedback.js";
+export * from "./chat.js";
+export * from "./Dots.js";
+export * from "./selection.js";
+export * from "./SelectElements.js";
+export * from "./ResultsTable.js";
