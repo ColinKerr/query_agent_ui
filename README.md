@@ -95,3 +95,29 @@ moving dots. Nothing is uploaded by the controls: feedback goes to the host's `o
 To try a change in an app, run `npm run dev` here and `npm link @colin_kerr/query-agent-client
 @colin_kerr/query-agent-react` in the app. The app must load one copy of React (in Vite,
 `resolve.dedupe: ["react", "react-dom"]`).
+
+## Release
+
+Both packages are released together, with the same version, from `main`. A tag starts the release
+workflow (`.github/workflows/release.yml`), which stages both packages on npm. Nothing is public
+until you approve each staged version.
+
+### Each release
+
+1. On a branch, run `npm run version:set -- <version>`. It sets both packages' versions, points the
+   React package's dependency on the client at that version, and refreshes `package-lock.json`.
+2. Add a `## <version>` entry to `CHANGELOG.md`.
+3. Run `npm run build`, `npm test` and `npm run typecheck`.
+4. Commit, and merge to `main`. CI must pass.
+5. Tag the merge commit and push the tag:
+   ```
+   git tag v<version>
+   git push origin v<version>
+   ```
+
+### If a release goes wrong
+
+- **Before anything is staged** (the workflow failed early): fix it on `main`, delete the tag
+  (`git tag -d v<version> && git push origin :refs/tags/v<version>`), and tag again.
+- **Staged, not approved:** reject the staged versions then delete tag and start release again with fixes.
+- **Approved and published:** do not move the tag. Release the next version.
